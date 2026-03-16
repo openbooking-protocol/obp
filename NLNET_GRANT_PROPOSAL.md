@@ -174,25 +174,100 @@ OBP directly addresses NLnet's mission:
 
 ## 9. Demo Video Script (2–3 minutes)
 
-*[Script for recording — actual video to be recorded for submission]*
+*[Script for recording — use a screen recorder (OBS, Loom) with terminal + browser side by side]*
+
+---
 
 **[0:00–0:20] Hook**
+
+*Narration (voiceover or text overlay):*
 "You can send an email to anyone, regardless of which email provider they use. You can visit any website, regardless of which hosting company runs it. But to book an appointment, you're forced to use whichever platform the business chose — and give that platform your data. OBP changes that."
 
+---
+
 **[0:20–0:50] What is OBP?**
-Show the `/.well-known/obp` endpoint. Explain it's like a business card for any booking server — anyone can discover it, connect to it, book from it.
 
-**[0:50–1:30] Self-hosting demo**
-Run `npx create-obp-server my-salon` — show the generated project. Start it, run `npx @obp/validator http://localhost:3000` — all checks pass.
+*Show in browser:*
+```
+curl http://localhost:3000/.well-known/obp | jq
+```
+Point out: `serverUrl`, `capabilities: ["booking", "federation", "webhooks"]`, `federation.publicKeyId`.
 
-**[1:30–2:10] End-to-end booking**
-Open the reference frontend. Browse services. Pick a slot. Fill in name + email. Confirm. Show the confirmation page with iCal download.
+*Narration:* "Every OBP server announces itself at a standard URL — like a business card. Any client, any aggregator, any calendar app can discover it and start booking."
+
+---
+
+**[0:50–1:30] Self-hosting in 60 seconds**
+
+*Show in terminal:*
+```bash
+git clone https://github.com/openbooking-protocol/obp
+cd obp
+docker compose up -d postgres redis
+cd server && npm install
+npm run db:migrate && npm run db:seed
+npm run dev
+```
+
+*Show result:* Server starts, logs show `Server started` on port 3000.
+
+*Then show:*
+```bash
+curl http://localhost:3000/obp/v1/providers | jq '.items[0].name'
+# "Frizerski salon Nikola"
+curl http://localhost:3000/obp/v1/services?providerId=... | jq '[.items[].name]'
+# ["Muško šišanje", "Žensko šišanje", "Farbanje"]
+```
+
+*Narration:* "A working booking server — with real services, real schedules, and real availability — running in under a minute."
+
+---
+
+**[1:30–2:10] End-to-end booking flow**
+
+*Open browser at `http://localhost:3001` (frontend):*
+1. Home page — show search bar and categories
+2. Click on "Frizerski salon Nikola"
+3. Click "Muško šišanje" (30 min, 1500 RSD)
+4. Pick tomorrow's date — slots appear (09:00, 09:40, 10:20...)
+5. Select 09:00 — slot held for 10 minutes, countdown visible
+6. Fill in: Name, Email, optional note
+7. Click "Book" — confirmation page appears
+8. Show "Download .ics" button — click it, calendar file downloads
+
+*Narration:* "Slot hold prevents double-booking during checkout. The booking creates an iCal file compatible with any calendar app."
+
+---
 
 **[2:10–2:40] Federation demo**
-Start two local servers. Register them as peers. Search from Server A — results appear from Server B. Book a Novi Sad service from the Belgrade app.
+
+*Show in terminal — start a second server on port 3001:*
+```bash
+# Terminal 2
+PORT=3001 SERVER_URL=http://localhost:3001 SERVER_NAME="Novi Sad Server" npm run dev
+```
+
+*Register as peers via API:*
+```bash
+curl -X POST http://localhost:3000/federation/peers \
+  -H "X-Api-Key: ..." \
+  -d '{"serverUrl": "http://localhost:3001"}'
+```
+
+*Show federated search in browser:*
+- Toggle "Search all servers" on
+- Search returns results from both servers
+- Each result shows server badge: "Local" (green) vs "localhost:3001" (blue)
+
+*Narration:* "Two independent servers, no shared database, no central authority — but a customer on one can discover and book services on the other. This is the core of OBP."
+
+---
 
 **[2:40–3:00] Call to action**
-"OBP is open source, MIT licensed, and ready for early adopters. If you run a business, host it yourself. If you're a developer, build with the SDK. If you're a community, help us grow the standard."
+
+*Show GitHub repo: github.com/openbooking-protocol/obp*
+
+*Narration:* "OBP is open source under MIT and AGPL licenses. The specification is Creative Commons. If you run a small business — host it yourself. If you're a developer — build with the REST API or the JavaScript and Python SDKs. If you believe booking should be a commons, not a platform — join us."
 
 ---
 
