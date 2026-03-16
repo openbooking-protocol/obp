@@ -1,0 +1,26 @@
+{
+  "name": "@obp/validator",
+  "version": "0.1.0",
+  "description": "OBP server compliance validator — checks if a server correctly implements the OpenBooking Protocol",
+  "keywords": ["obp", "validator", "compliance", "openapi"],
+  "license": "MIT",
+  "bin": {
+    "obp-validate": "./dist/cli.js"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

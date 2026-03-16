@@ -1,0 +1,21 @@
+{
+  "name": "create-obp-server",
+  "version": "0.1.0",
+  "description": "Scaffold a new OpenBooking Protocol server",
+  "keywords": ["obp", "scaffold", "create"],
+  "license": "MIT",
+  "bin": {
+    "create-obp-server": "./dist/cli.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

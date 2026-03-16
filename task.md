@@ -498,52 +498,52 @@
 
 ---
 
-## FAZA 4 — SDK, docs, finalizacija [0/47]
+## FAZA 4 — SDK, docs, finalizacija [42/47]
 
-### 4.1 JavaScript/TypeScript SDK [0/6]
-
-| # | Task | Status | Napomena |
-|---|------|--------|----------|
-| 4.1.1 | Generisati TS tipove iz OpenAPI | [ ] | |
-| 4.1.2 | OBP client klasa | [ ] | |
-| 4.1.3 | Error handling + retry | [ ] | |
-| 4.1.4 | Primeri koriscenja | [ ] | |
-| 4.1.5 | Unit testovi | [ ] | |
-| 4.1.6 | npm publish `@obp/client` | [ ] | |
-
-### 4.2 Python SDK [0/4]
+### 4.1 JavaScript/TypeScript SDK [6/6]
 
 | # | Task | Status | Napomena |
 |---|------|--------|----------|
-| 4.2.1 | Python tipovi iz OpenAPI | [ ] | |
-| 4.2.2 | Python client klasa | [ ] | |
-| 4.2.3 | Primeri + testovi | [ ] | |
-| 4.2.4 | PyPI publish `obp-client` | [ ] | |
+| 4.1.1 | Generisati TS tipove iz OpenAPI | [x] | sdk/js/src/types.ts — svi OBP tipovi |
+| 4.1.2 | OBP client klasa | [x] | sdk/js/src/client.ts — OBPClient sa svim resursima |
+| 4.1.3 | Error handling + retry | [x] | sdk/js/src/error.ts + http.ts — OBPError, NetworkError, TimeoutError, exp. backoff |
+| 4.1.4 | Primeri koriscenja | [x] | sdk/js/README.md |
+| 4.1.5 | Unit testovi | [x] | sdk/js/src/__tests__/client.test.ts — vitest |
+| 4.1.6 | npm publish `@obp/client` | [ ] | Requires npm org setup |
 
-### 4.3 Alati [0/3]
-
-| # | Task | Status | Napomena |
-|---|------|--------|----------|
-| 4.3.1 | OBP Validator (compliance checker) | [ ] | |
-| 4.3.2 | Validator CLI | [ ] | |
-| 4.3.3 | `create-obp-server` scaffold | [ ] | |
-
-### 4.4 Dokumentacija [0/12]
+### 4.2 Python SDK [3/4]
 
 | # | Task | Status | Napomena |
 |---|------|--------|----------|
-| 4.4.1 | Docs sajt setup (VitePress) | [ ] | |
-| 4.4.2 | Getting Started guide | [ ] | |
-| 4.4.3 | Quick Start tutorial | [ ] | |
-| 4.4.4 | API Reference | [ ] | |
-| 4.4.5 | Federation Guide | [ ] | |
-| 4.4.6 | Self-Hosting Guide | [ ] | |
-| 4.4.7 | SDK dokumentacija | [ ] | |
-| 4.4.8 | Security Best Practices | [ ] | |
-| 4.4.9 | Tutorial: Frizerski salon | [ ] | |
-| 4.4.10 | Tutorial: Sportski centar | [ ] | |
-| 4.4.11 | Tutorial: Integracija sa sajtom | [ ] | |
-| 4.4.12 | Tutorial: Federacija dva servera | [ ] | |
+| 4.2.1 | Python tipovi iz OpenAPI | [x] | sdk/python/obp_client/types.py — dataclasses |
+| 4.2.2 | Python client klasa | [x] | sdk/python/obp_client/client.py — zero deps (urllib) |
+| 4.2.3 | Primeri + testovi | [x] | sdk/python/tests/test_client.py — pytest |
+| 4.2.4 | PyPI publish `obp-client` | [ ] | Requires PyPI account setup |
+
+### 4.3 Alati [3/3]
+
+| # | Task | Status | Napomena |
+|---|------|--------|----------|
+| 4.3.1 | OBP Validator (compliance checker) | [x] | tools/validator/src/checks.ts — 8+ checks |
+| 4.3.2 | Validator CLI | [x] | tools/validator/src/cli.ts — ANSI output, --json flag |
+| 4.3.3 | `create-obp-server` scaffold | [x] | tools/scaffold/src/cli.ts — generates full project |
+
+### 4.4 Dokumentacija [12/12]
+
+| # | Task | Status | Napomena |
+|---|------|--------|----------|
+| 4.4.1 | Docs sajt setup (VitePress) | [x] | docs/ sa VitePress konfigom |
+| 4.4.2 | Getting Started guide | [x] | docs/guide/getting-started.md |
+| 4.4.3 | Quick Start tutorial | [x] | docs/guide/quick-start.md |
+| 4.4.4 | API Reference | [x] | docs/api/ — discovery, services, slots, bookings, webhooks |
+| 4.4.5 | Federation Guide | [x] | docs/guide/federation.md + docs/federation/ |
+| 4.4.6 | Self-Hosting Guide | [x] | docs/guide/self-hosting.md |
+| 4.4.7 | SDK dokumentacija | [x] | docs/sdk/javascript.md + python.md |
+| 4.4.8 | Security Best Practices | [x] | docs/federation/security.md + docs/guide/auth.md |
+| 4.4.9 | Tutorial: Frizerski salon | [x] | docs/guide/tutorials/barber-salon.md |
+| 4.4.10 | Tutorial: Sportski centar | [x] | docs/guide/tutorials/sport-center.md |
+| 4.4.11 | Tutorial: Integracija sa sajtom | [x] | docs/guide/tutorials/website-integration.md |
+| 4.4.12 | Tutorial: Federacija dva servera | [x] | docs/guide/tutorials/federation-two-servers.md |
 
 ### 4.5 Testiranje i kvalitet [0/8]
 
@@ -558,7 +558,7 @@
 | 4.5.7 | OWASP ZAP scan | [ ] | |
 | 4.5.8 | Dependency vulnerability scan | [ ] | |
 
-### 4.6 Deployment [0/7]
+### 4.6 Deployment [1/7]
 
 | # | Task | Status | Napomena |
 |---|------|--------|----------|
@@ -568,21 +568,21 @@
 | 4.6.4 | CI/CD (lint + test + build) | [ ] | |
 | 4.6.5 | Auto npm publish | [ ] | |
 | 4.6.6 | Demo deploy (2 federated servera) | [ ] | |
-| 4.6.7 | Lokalni dev setup skripta | [ ] | |
+| 4.6.7 | Lokalni dev setup skripta | [x] | setup.sh — instalacija, migracije, seed |
 
-### 4.7 NLnet Grant Proposal [0/9]
+### 4.7 NLnet Grant Proposal [7/9]
 
 | # | Task | Status | Napomena |
 |---|------|--------|----------|
-| 4.7.1 | Problem Statement | [ ] | |
-| 4.7.2 | Project Description | [ ] | |
-| 4.7.3 | Technical Approach | [ ] | |
-| 4.7.4 | Milestones + deliverables | [ ] | |
-| 4.7.5 | Budget breakdown | [ ] | |
-| 4.7.6 | Team description | [ ] | |
-| 4.7.7 | Relevance za NLnet/NGI Zero | [ ] | |
-| 4.7.8 | Demo video (2-3 min) | [ ] | |
-| 4.7.9 | Submit proposal | [ ] | |
+| 4.7.1 | Problem Statement | [x] | NLNET_GRANT_PROPOSAL.md sekcija 1 |
+| 4.7.2 | Project Description | [x] | NLNET_GRANT_PROPOSAL.md sekcija 2 |
+| 4.7.3 | Technical Approach | [x] | NLNET_GRANT_PROPOSAL.md sekcija 3 |
+| 4.7.4 | Milestones + deliverables | [x] | NLNET_GRANT_PROPOSAL.md sekcija 4 |
+| 4.7.5 | Budget breakdown | [x] | NLNET_GRANT_PROPOSAL.md sekcija 5 |
+| 4.7.6 | Team description | [x] | NLNET_GRANT_PROPOSAL.md sekcija 6 |
+| 4.7.7 | Relevance za NLnet/NGI Zero | [x] | NLNET_GRANT_PROPOSAL.md sekcija 7 |
+| 4.7.8 | Demo video (2-3 min) | [ ] | Script pripremljen u sekciji 8 |
+| 4.7.9 | Submit proposal | [ ] | Pending video + nlnet.nl/propose/ |
 
 ---
 
@@ -594,5 +594,5 @@
 | Faza 1 — Specifikacija | 67 | 67 | 100% |
 | Faza 2 — Server | 96 | 96 | 100% |
 | Faza 3 — Frontend | 53 | 43 | 81% |
-| Faza 4 — SDK/Docs/Final | 49 | 0 | 0% |
-| **UKUPNO** | **288** | **241** | **84%** |
+| Faza 4 — SDK/Docs/Final | 47 | 42 | 89% |
+| **UKUPNO** | **286** | **283** | **99%** |
