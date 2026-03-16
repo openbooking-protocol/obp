@@ -15,3 +15,10 @@ export const holdSlotBodySchema = z.object({
 });
 
 export type ListSlotsQuery = z.infer<typeof listSlotsQuerySchema>;
+
+export const generateSlotsBodySchema = z.object({
+  providerId: z.string().min(1),
+  serviceId: z.string().min(1),
+  from: z.string().datetime(),
+  to: z.string().datetime(),
+});

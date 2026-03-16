@@ -4,6 +4,7 @@ import type {
   CreateBookingInput,
   CreateProviderInput,
   CreateServiceInput,
+  FederatedProviderResult,
   FederationPeer,
   HoldSlotResponse,
   PaginatedResponse,
@@ -23,6 +24,14 @@ import type {
 
 const BASE_URL =
   process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3000";
+
+// ── Runtime auth token (set after OAuth2 exchange) ────────────────────────
+
+let _runtimeToken: string | undefined;
+
+export function setAuthToken(token: string): void {
+  _runtimeToken = token;
+}
 
 // ── Error ─────────────────────────────────────────────────────────────────
 
@@ -48,10 +57,10 @@ interface FetchOptions {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
-async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
+async function apiFetchBase<T>(baseUrl: string, path: string, options: FetchOptions = {}): Promise<T> {
   const { method = "GET", body, apiKey, token, params } = options;
 
-  const url = new URL(`${BASE_URL}${path}`);
+  const url = new URL(`${baseUrl}${path}`);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) {
@@ -65,7 +74,8 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
     Accept: "application/json",
   };
   if (apiKey) headers["X-Api-Key"] = apiKey;
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const effectiveToken = token ?? _runtimeToken;
+  if (effectiveToken) headers["Authorization"] = `Bearer ${effectiveToken}`;
 
   const res = await fetch(url.toString(), {
     method,
@@ -91,6 +101,10 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
+  return apiFetchBase<T>(BASE_URL, path, options);
 }
 
 // ── OBP API Client ────────────────────────────────────────────────────────
@@ -370,6 +384,18 @@ export const obpApi = {
     },
   },
 
+  // ── Federation search ─────────────────────────────────────────────────
+
+  federation: {
+    search(params?: {
+      q?: string;
+      category?: string;
+      limit?: number;
+    }): Promise<PaginatedResponse<FederatedProviderResult>> {
+      return apiFetch("/federation/search", { params });
+    },
+  },
+
   // ── Auth ──────────────────────────────────────────────────────────────
 
   auth: {
@@ -384,6 +410,21 @@ export const obpApi = {
         apiKey: adminKey,
       });
     },
+
+    exchangeCode(params: {
+      code: string;
+      code_verifier: string;
+      redirect_uri: string;
+      client_id: string;
+    }): Promise<{ access_token: string; token_type: string; expires_in?: number; scope?: string }> {
+      return apiFetch("/obp/v1/auth/token", {
+        method: "POST",
+        body: {
+          grant_type: "authorization_code",
+          ...params,
+        },
+      });
+    },
   },
 };
 
@@ -395,4 +436,38 @@ export function providerCalendarUrl(providerId: string): string {
 
 export function bookingCalendarUrl(bookingId: string): string {
   return `${BASE_URL}/bookings/${bookingId}/calendar.ics`;
+}
+
+// ── Federated client factory ───────────────────────────────────────────────
+
+/**
+ * Returns a subset of the API client bound to a different server base URL.
+ * Used for cross-server (federated) bookings.
+ */
+export function federatedClient(baseUrl: string) {
+  function fetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
+    return apiFetchBase<T>(baseUrl, path, options);
+  }
+
+  return {
+    slots: {
+      list(params: {
+        service_id: string;
+        date_from: string;
+        date_to: string;
+        resource_id?: string;
+        limit?: number;
+      }): Promise<PaginatedResponse<Slot>> {
+        return fetch("/obp/v1/slots", { params });
+      },
+      hold(id: string): Promise<HoldSlotResponse> {
+        return fetch(`/obp/v1/slots/${id}/hold`, { method: "POST" });
+      },
+    },
+    bookings: {
+      create(input: CreateBookingInput): Promise<Booking> {
+        return fetch("/obp/v1/bookings", { method: "POST", body: input });
+      },
+    },
+  };
 }

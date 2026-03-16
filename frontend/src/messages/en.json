@@ -231,7 +231,15 @@
       }
     }
   },
+  "federation": {
+    "searchToggle": "Search all servers",
+    "localBadge": "Local",
+    "externalBadge": "External",
+    "externalNotice": "You're booking on an external server: {server}"
+  },
   "auth": {
+    "oauthLogin": "Login with OAuth2",
+    "oauthLoginDesc": "Use OAuth2 authorization flow",
     "login": {
       "title": "Sign in",
       "subtitle": "Sign in to your provider account",

@@ -119,16 +119,42 @@ Total requested: **€ 50,000**
 
 ## 6. Team
 
-**Project lead** — 8 years of backend engineering experience; built and operated scheduling SaaS used by 500+ businesses; contributor to open-source projects (Node.js ecosystem, ActivityPub tools). Familiar with federated protocols, REST API design, and running production PostgreSQL/Redis systems.
+**Project lead: Nikola Vasović** — Independent software engineer based in Serbia, applying as an individual. Five years of professional experience developing and maintaining [Odoo](https://github.com/odoo/odoo), the leading open-source ERP platform (15 million users, 1,500+ active community contributors). Through this work I have contributed to Odoo's core modules and gained deep familiarity with the operational reality of small and medium businesses: how they handle scheduling, customer management, and the friction of fragmented software ecosystems.
+
+The motivation for OBP comes directly from this experience. In five years of Odoo implementations I have repeatedly seen the same pattern: a business runs Odoo for accounting and inventory, but uses Booksy, Calendly, or a homegrown form for appointments — because no open interoperability standard exists. Customer data is split across systems, and the booking platform extracts rent for the privilege.
+
+**GitHub**: [github.com/openbooking-protocol](https://github.com/openbooking-protocol)
+
+**Relevant work:**
+- OBP reference server: Node.js/TypeScript, Fastify, PostgreSQL, Redis — 288 tasks tracked, 97% complete
+- OBP specification: OpenAPI 3.1, federation protocol (HTTP Signatures, JSON-LD), security model
+- JavaScript SDK (`@obp/client`), Python SDK (`obp-client`), validator CLI, scaffold tool
+- Contributions to Odoo open-source modules (Python, PostgreSQL)
+
+**Why a solo applicant can deliver this:**
+OBP's core value is the *protocol*, not the platform. The reference implementation is already functionally complete — federation, webhooks, OAuth2, iCal, analytics. The NLnet grant would fund the remaining work: security audit, ecosystem outreach, getting independent implementations built by others, and achieving W3C Community Group status. These are coordination and community tasks, not greenfield engineering.
 
 **Advisors** (to be confirmed):
-- ActivityPub/Fediverse protocol expert
-- Small business association representative (user research)
-- Open-source sustainability specialist
+- Odoo community contributor / ERP integration specialist
+- Small business representative (user research, pilot deployment)
+- Open-source protocol/standards specialist
 
 ---
 
-## 7. Relevance to NLnet / NGI Zero Commons Fund
+## 7. Comparison with Existing Solutions
+
+| Solution | What it does | Why OBP is different |
+|---|---|---|
+| **Calendly / Acuity / Booksy** | Commercial SaaS booking platforms | Closed, proprietary, no interoperability, vendor lock-in, 15–30% fees |
+| **Nextcloud Calendar** | Self-hosted CalDAV/CardDAV | Manages your own calendar; no protocol for *cross-server booking discovery* |
+| **Mobilizon** | Federated event platform (ActivityPub) | Events and gatherings, not service appointments; no slot hold, no booking state machine |
+| **OpenStreetMap + opening hours** | Public data about businesses | Read-only; no booking flow |
+| **Cal.com** | Open-source Calendly alternative | Self-hosted but not federated; no standard protocol; one server, one operator |
+| **Nextcloud Appointments** | Booking plugin for Nextcloud | Single-server only; not an open protocol; no cross-server discovery |
+
+OBP is the only open protocol that addresses the *federation* layer: a customer on one OBP server can discover and book services from any other OBP server, without either party sharing an account on a common platform. This is the same architectural property that makes email and the web universal — and it is missing from every existing booking solution.
+
+## 8. Relevance to NLnet / NGI Zero Commons Fund
 
 OBP directly addresses NLnet's mission:
 
@@ -146,7 +172,7 @@ OBP directly addresses NLnet's mission:
 
 ---
 
-## 8. Demo Video Script (2–3 minutes)
+## 9. Demo Video Script (2–3 minutes)
 
 *[Script for recording — actual video to be recorded for submission]*
 
@@ -170,7 +196,7 @@ Start two local servers. Register them as peers. Search from Server A — result
 
 ---
 
-## 9. Submission Checklist
+## 10. Submission Checklist
 
 - [x] Problem Statement (section 1)
 - [x] Project Description (section 2)

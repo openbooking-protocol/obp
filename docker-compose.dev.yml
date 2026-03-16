@@ -3,6 +3,7 @@ services:
     build:
       context: ./server
       target: development
+    command: npm run dev
     ports:
       - "3000:3000"
     environment:
@@ -13,9 +14,11 @@ services:
       JWT_SECRET: dev-jwt-secret-change-in-production-min32chars
       API_KEY_SALT: dev-api-key-salt-change
       SERVER_NAME: OBP Development Server
-      LOG_LEVEL: info
+      LOG_LEVEL: debug
     volumes:
       - ./server/src:/app/src
+      - ./server/package.json:/app/package.json
+      - ./server/tsconfig.json:/app/tsconfig.json
     depends_on:
       postgres:
         condition: service_healthy

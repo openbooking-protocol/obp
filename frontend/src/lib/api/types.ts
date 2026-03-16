@@ -263,6 +263,23 @@ export interface FederationPeer {
   updated_at: string;
 }
 
+// ── Federated search ──────────────────────────────────────────────────────
+
+export interface FederatedProviderResult {
+  id: string;
+  name: string;
+  description: string;
+  category: ProviderCategory;
+  location: ProviderLocation;
+  timezone: string;
+  contact: ProviderContact;
+  logo_url?: string;
+  status: ProviderStatus;
+  serverUrl: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── Discovery ─────────────────────────────────────────────────────────────
 
 export interface WellKnownObp {

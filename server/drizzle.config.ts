@@ -1,12 +1,14 @@
 import type { Config } from 'drizzle-kit';
-import { config as appConfig } from './src/config.js';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 export default {
   schema: './src/db/schema.ts',
   out: './src/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: appConfig.DATABASE_URL,
+    url: process.env['DATABASE_URL'] ?? 'postgresql://obp:obp@localhost:5432/obp',
   },
   verbose: true,
   strict: true,

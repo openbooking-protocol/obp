@@ -7,8 +7,13 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-    env_file:
-      - ./server/.env
+      DATABASE_URL: postgresql://obp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-obp}
+      REDIS_URL: redis://redis:6379
+      SERVER_URL: ${SERVER_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      API_KEY_SALT: ${API_KEY_SALT:?API_KEY_SALT is required}
+      SERVER_NAME: ${SERVER_NAME:-OBP Server}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       postgres:
         condition: service_healthy
@@ -19,22 +24,6 @@ services:
       resources:
         limits:
           memory: 512m
-
-  frontend:
-    build:
-      context: ./frontend
-      target: production
-    ports:
-      - "3001:3001"
-    env_file:
-      - ./frontend/.env
-    depends_on:
-      - server
-    restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 256m
 
   postgres:
     image: postgres:15-alpine
@@ -50,18 +39,26 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   redis:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
 volumes:
   postgres_data:

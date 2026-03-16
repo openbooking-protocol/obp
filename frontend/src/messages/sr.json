@@ -231,7 +231,15 @@
       }
     }
   },
+  "federation": {
+    "searchToggle": "Pretraži sve servere",
+    "localBadge": "Lokalni",
+    "externalBadge": "Eksterni",
+    "externalNotice": "Zakazujete na eksternom serveru: {server}"
+  },
   "auth": {
+    "oauthLogin": "Prijava putem OAuth2",
+    "oauthLoginDesc": "Koristite OAuth2 tok autorizacije",
     "login": {
       "title": "Prijava",
       "subtitle": "Prijavite se na vaš nalog pružaoca",

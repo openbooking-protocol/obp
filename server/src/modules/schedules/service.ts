@@ -1,4 +1,5 @@
 import { eq, and } from 'drizzle-orm';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { getDb, schema } from '../../db/index.js';
 import { generateId } from '../../lib/id.js';
 import { Errors } from '../../lib/errors.js';
@@ -95,12 +96,15 @@ export function generateTimeWindows(
   const exceptions = schedule.exceptions as ScheduleException[];
   const tz = schedule.timezone;
 
-  const current = new Date(from);
-  current.setHours(0, 0, 0, 0);
+  // Work in the schedule's timezone
+  const currentZoned = toZonedTime(from, tz);
+  currentZoned.setHours(0, 0, 0, 0);
+  const current = fromZonedTime(currentZoned, tz);
 
   while (current <= to) {
-    const dateStr = formatDate(current);
-    const dayOfWeek = current.getDay();
+    const currentInTz = toZonedTime(current, tz);
+    const dateStr = formatDate(currentInTz);
+    const dayOfWeek = currentInTz.getDay();
 
     // Check exceptions first
     const exception = exceptions.find((e) => e.date === dateStr);
@@ -113,11 +117,14 @@ export function generateTimeWindows(
         const [startH, startM] = slot.start.split(':').map(Number);
         const [endH, endM] = slot.end.split(':').map(Number);
 
-        const slotStart = new Date(current);
-        slotStart.setHours(startH!, startM!, 0, 0);
+        // Build start/end in the schedule's timezone, then convert to UTC
+        const slotStartZoned = toZonedTime(current, tz);
+        slotStartZoned.setHours(startH!, startM!, 0, 0);
+        const slotStart = fromZonedTime(slotStartZoned, tz);
 
-        const slotEnd = new Date(current);
-        slotEnd.setHours(endH!, endM!, 0, 0);
+        const slotEndZoned = toZonedTime(current, tz);
+        slotEndZoned.setHours(endH!, endM!, 0, 0);
+        const slotEnd = fromZonedTime(slotEndZoned, tz);
 
         // Generate individual appointment windows
         const slotDuration = durationMinutes + bufferAfterMinutes;
@@ -135,7 +142,11 @@ export function generateTimeWindows(
       }
     }
 
-    current.setDate(current.getDate() + 1);
+    // Advance by one day in the schedule's timezone (handles DST)
+    const nextZoned = toZonedTime(current, tz);
+    nextZoned.setDate(nextZoned.getDate() + 1);
+    nextZoned.setHours(0, 0, 0, 0);
+    current.setTime(fromZonedTime(nextZoned, tz).getTime());
   }
 
   return windows;

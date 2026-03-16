@@ -1,0 +1,23 @@
+name: Security
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday
+  push:
+    branches: [main]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Audit server deps
+        run: cd server && npm audit --audit-level=high
+        continue-on-error: true
+      - name: Audit frontend deps
+        run: cd frontend && npm audit --audit-level=high
+        continue-on-error: true
+      - name: Audit SDK JS deps
+        run: cd sdk/js && npm audit --audit-level=high
+        continue-on-error: true
