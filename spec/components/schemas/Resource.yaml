@@ -1,0 +1,121 @@
+# Resource schema — OpenBooking Protocol
+# Tasks: 1.1.7 (schema), 1.1.8 (resource-service vezivanje)
+
+ResourceType:
+  type: string
+  description: |
+    The type of resource:
+    - `staff` — a person (stylist, therapist, trainer)
+    - `room` — a physical space (treatment room, court, studio)
+    - `equipment` — a piece of equipment (chair, machine, lane)
+  enum: [staff, room, equipment]
+
+ResourceStatus:
+  type: string
+  enum: [active, inactive]
+
+Resource:
+  type: object
+  description: |
+    A Resource is a physical or virtual entity required to deliver a Service.
+    A slot can only be generated if all Resources required by the Service are
+    simultaneously available (not booked or blocked).
+
+    Resources have their own Schedules, which define their individual availability.
+    If a Resource has no Schedule, it inherits the Provider's Schedule.
+
+    Resource–Service binding:
+    - A Service lists its required resource_ids
+    - A Slot is generated only at times when ALL listed Resources are available
+    - One Resource can serve multiple Services (e.g., a staff member who cuts
+      both men's and women's hair)
+    - A Service with no resource_ids is generated from the Provider's Schedule directly
+  required:
+    - id
+    - provider_id
+    - name
+    - type
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique resource identifier (prefix `res_`)
+      example: "res_ana_p"
+      readOnly: true
+    provider_id:
+      type: string
+      example: "prv_k3j9mxyz"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      description: Display name (e.g., staff member name, room name)
+      example: "Ana Petrović"
+    description:
+      type: string
+      maxLength: 500
+      nullable: true
+      example: "Senior stilist, specijalizovana za bojenje kose."
+    type:
+      $ref: '#/ResourceType'
+    avatar_url:
+      type: string
+      format: uri
+      nullable: true
+      description: Photo URL (primarily for staff resources)
+      example: "https://cdn.example.com/staff/ana.jpg"
+    status:
+      $ref: '#/ResourceStatus'
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+
+ResourceCreate:
+  type: object
+  required:
+    - name
+    - type
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      example: "Ana Petrović"
+    description:
+      type: string
+      maxLength: 500
+    type:
+      $ref: '#/ResourceType'
+    avatar_url:
+      type: string
+      format: uri
+
+ResourceUpdate:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    description:
+      type: string
+      maxLength: 500
+    avatar_url:
+      type: string
+      format: uri
+      nullable: true
+    status:
+      $ref: '#/ResourceStatus'
+
+# Resource–Service binding rules:
+# - resource_ids on a Service must all belong to the same provider_id
+# - Removing a resource from a service does not affect existing bookings
+# - Deactivating a resource blocks new slot generation but does not cancel bookings
+# - Resources can be assigned to multiple services
+# - Slot conflict check: a resource is unavailable if it appears in any
+#   non-cancelled booking whose time range overlaps the candidate slot

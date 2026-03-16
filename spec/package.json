@@ -1,0 +1,19 @@
+{
+  "name": "@obp/spec",
+  "version": "0.1.0",
+  "description": "OpenBooking Protocol — API Specification",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "validate": "spectral lint openapi.yaml --ruleset .spectral.yaml",
+    "preview": "redocly preview-docs openapi.yaml",
+    "build:docs": "redocly build-docs openapi.yaml --output ../docs/api.html",
+    "bundle": "redocly bundle openapi.yaml --output openapi.bundled.yaml"
+  },
+  "devDependencies": {
+    "@stoplight/spectral-cli": "^6.14.2",
+    "@stoplight/spectral-formats": "^1.7.0",
+    "@stoplight/spectral-rulesets": "^1.21.2",
+    "@redocly/cli": "^1.21.0"
+  }
+}

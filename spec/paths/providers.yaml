@@ -1,0 +1,194 @@
+# Provider endpoints
+# Tasks: 1.2.2, 1.2.3, 1.2.4, 1.2.14, 1.2.15
+
+'/obp/v1/providers':
+  get:
+    operationId: listProviders
+    summary: List providers
+    description: |
+      Returns a paginated list of active providers on this server.
+      Public endpoint — no authentication required.
+    tags: [Discovery]
+    security: []
+    parameters:
+      - name: category
+        in: query
+        schema:
+          $ref: '../components/schemas/Provider.yaml#/ProviderCategory'
+        description: Filter by provider category
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 100
+        description: Full-text search across name and description
+      - name: lat
+        in: query
+        schema:
+          type: number
+        description: Latitude for proximity sort (requires lng)
+      - name: lng
+        in: query
+        schema:
+          type: number
+        description: Longitude for proximity sort (requires lat)
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: cursor
+        in: query
+        schema:
+          type: string
+        description: Pagination cursor from previous response
+    responses:
+      '200':
+        description: Paginated list of providers
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, pagination]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Provider.yaml#/Provider'
+                pagination:
+                  $ref: '../components/schemas/Common.yaml#/Pagination'
+
+  post:
+    operationId: createProvider
+    summary: Create a provider
+    description: Register a new provider on this server. Requires admin API key.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [admin]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Provider.yaml#/ProviderCreate'
+    responses:
+      '201':
+        description: Provider created
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Provider.yaml#/Provider'
+      '409':
+        description: Slug already taken
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/providers/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Provider ID (e.g. `prv_k3j9mxyz`) or slug
+
+  get:
+    operationId: getProvider
+    summary: Get provider
+    description: Returns details of a single provider. Public endpoint.
+    tags: [Discovery]
+    security: []
+    responses:
+      '200':
+        description: Provider details
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Provider.yaml#/Provider'
+      '404':
+        description: Provider not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  put:
+    operationId: updateProvider
+    summary: Update provider
+    description: Update provider details. Requires provider API key.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Provider.yaml#/ProviderUpdate'
+    responses:
+      '200':
+        description: Updated provider
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Provider.yaml#/Provider'
+      '404':
+        description: Provider not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/categories':
+  get:
+    operationId: listCategories
+    summary: List supported categories
+    description: |
+      Returns all supported provider and service categories.
+      Public endpoint — no authentication required.
+    tags: [Discovery]
+    security: []
+    responses:
+      '200':
+        description: Category list
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider_categories:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      value:
+                        $ref: '../components/schemas/Provider.yaml#/ProviderCategory'
+                      label:
+                        type: string
+                        example: "Hair Salon"
+                service_categories:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      value:
+                        $ref: '../components/schemas/Service.yaml#/ServiceCategory'
+                      label:
+                        type: string
+                        example: "Haircut"

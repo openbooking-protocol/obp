@@ -1,0 +1,29 @@
+apis:
+  main:
+    root: openapi.yaml
+
+lint:
+  extends:
+    - recommended
+
+  rules:
+    operation-operationId: error
+    operation-summary: error
+    tag-description: warn
+    no-unused-components: warn
+    spec-components-invalid-map-name: error
+
+theme:
+  openapi:
+    theme:
+      colors:
+        primary:
+          main: "#6366f1"
+      typography:
+        fontSize: "16px"
+        fontFamily: "Inter, sans-serif"
+        headings:
+          fontFamily: "Inter, sans-serif"
+      sidebar:
+        backgroundColor: "#0f172a"
+        textColor: "#e2e8f0"

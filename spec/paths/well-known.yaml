@@ -1,0 +1,52 @@
+# GET /.well-known/obp — OBP Server discovery endpoint
+# Task: 1.2.1
+
+'/.well-known/obp':
+  get:
+    operationId: getWellKnownObp
+    summary: OBP server discovery
+    description: |
+      Returns the OBP server's discovery document. Used by clients and peer servers
+      to discover capabilities, federation endpoints, and the server's public key.
+
+      This endpoint must be publicly accessible with no authentication.
+      Responses should be cached (Cache-Control: public, max-age=3600).
+    tags: [Discovery]
+    security: []
+    responses:
+      '200':
+        description: OBP server discovery document
+        headers:
+          Cache-Control:
+            schema:
+              type: string
+              example: "public, max-age=3600"
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Discovery.yaml#/OBPDiscoveryDocument'
+            example:
+              version: "1.0"
+              server:
+                name: "My OBP Server"
+                url: "https://obp.example.com"
+                description: "OBP reference server"
+                admin_email: "admin@example.com"
+                public_key:
+                  algorithm: "Ed25519"
+                  value: "MCowBQYDK2VdAyEA..."
+              capabilities:
+                federation: true
+                webhooks: true
+                ical_export: true
+                oauth2: true
+              federation:
+                enabled: true
+                endpoints:
+                  search: "/obp/v1/federation/search"
+                  slots: "/obp/v1/federation/slots"
+                  book: "/obp/v1/federation/book"
+                  cancel: "/obp/v1/federation/cancel"
+              api:
+                version: "1"
+                base_url: "/obp/v1"

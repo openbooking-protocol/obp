@@ -1,0 +1,424 @@
+# Federation API paths — OpenBooking Protocol
+# Tasks: 1.4.1–1.4.10
+
+'/.well-known/webfinger':
+  get:
+    operationId: webfinger
+    summary: WebFinger discovery (RFC 7033)
+    description: |
+      Returns a JSON Resource Descriptor (JRD) for OBP server discovery.
+      Clients query this to confirm that a host supports OBP before
+      fetching the full `/.well-known/obp` document.
+
+      Example request:
+      ```
+      GET /.well-known/webfinger
+        ?resource=https://obp.example.com
+        &rel=https://obp.dev/ns/server
+      ```
+    tags: [Federation]
+    security: []
+    parameters:
+      - name: resource
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uri
+        description: The URI of the resource to look up (this server's URL)
+        example: "https://obp.example.com"
+      - name: rel
+        in: query
+        schema:
+          type: string
+        description: Filter links by relation type
+        example: "https://obp.dev/ns/server"
+    responses:
+      '200':
+        description: JSON Resource Descriptor
+        content:
+          application/jrd+json:
+            schema:
+              $ref: '../components/schemas/Federation.yaml#/WebFingerResponse'
+      '404':
+        description: Resource not found or WebFinger not supported
+
+'/obp/v1/federation/peers':
+  get:
+    operationId: listPeers
+    summary: List federation peers
+    description: |
+      Returns all registered peer servers. Admin only.
+    tags: [Federation]
+    security:
+      - ApiKeyAuth: [admin]
+    responses:
+      '200':
+        description: List of peers
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Federation.yaml#/FederationPeer'
+
+  post:
+    operationId: registerPeer
+    summary: Register a peer server
+    description: |
+      Initiates federation with this server. The request must be signed
+      with the registering server's private Ed25519 key (HTTP Signature).
+
+      **Registration flow:**
+      1. Server A sends POST /obp/v1/federation/peers to Server B
+      2. B verifies the HTTP Signature against the `public_key` in the request
+      3. B fetches A's `/.well-known/obp` to cross-check the public key
+      4. B creates the peer record with status `pending` (or `active` if auto-approve)
+      5. B optionally sends a reciprocal POST to A's federation/peers endpoint
+
+      This endpoint itself does NOT require an existing API key — it uses
+      HTTP Signatures for authentication.
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Federation.yaml#/PeerRegistrationRequest'
+    responses:
+      '201':
+        description: Peer registered
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Federation.yaml#/FederationPeer'
+      '409':
+        description: Peer already registered
+      '422':
+        description: Invalid request or signature verification failed
+
+'/obp/v1/federation/peers/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  get:
+    operationId: getPeer
+    summary: Get peer details
+    tags: [Federation]
+    security:
+      - ApiKeyAuth: [admin]
+    responses:
+      '200':
+        description: Peer
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Federation.yaml#/FederationPeer'
+      '404':
+        description: Peer not found
+
+  patch:
+    operationId: updatePeer
+    summary: Update peer status or trust level
+    description: Approve, suspend, or block a peer. Admin only.
+    tags: [Federation]
+    security:
+      - ApiKeyAuth: [admin]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                $ref: '../components/schemas/Federation.yaml#/FederationPeerStatus'
+              trust_level:
+                type: string
+                enum: [open, verified, trusted]
+    responses:
+      '200':
+        description: Updated peer
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Federation.yaml#/FederationPeer'
+
+  delete:
+    operationId: removePeer
+    summary: Remove a peer
+    description: Removes the peer registration. All further federation from this peer is rejected.
+    tags: [Federation]
+    security:
+      - ApiKeyAuth: [admin]
+    responses:
+      '204':
+        description: Peer removed
+
+'/obp/v1/federation/peers/{id}/key':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  put:
+    operationId: updatePeerKey
+    summary: Update peer public key (key rotation)
+    description: |
+      Called by a peer server after rotating its key pair.
+      The request must be signed with the NEW private key, and the body
+      must include the new public key. The server accepts requests signed
+      with the OLD key for 1 hour after rotation (grace period).
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [public_key]
+            properties:
+              public_key:
+                type: object
+                required: [algorithm, value]
+                properties:
+                  algorithm:
+                    type: string
+                    enum: [Ed25519]
+                  value:
+                    type: string
+    responses:
+      '200':
+        description: Key updated
+
+'/obp/v1/federation/search':
+  get:
+    operationId: federationSearch
+    summary: Federated provider search
+    description: |
+      Returns providers from this server that match the query.
+      Called by peer servers during cross-server discovery.
+      Requires HTTP Signature authentication from a registered peer.
+
+      Response includes a preview of each provider's services.
+      Full service details are fetched separately via federation/slots.
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Full-text search
+      - name: category
+        in: query
+        schema:
+          type: string
+        description: Provider or service category
+      - name: lat
+        in: query
+        schema:
+          type: number
+        description: Latitude for proximity filtering
+      - name: lng
+        in: query
+        schema:
+          type: number
+      - name: radius_km
+        in: query
+        schema:
+          type: number
+          minimum: 0.5
+          maximum: 100
+          default: 10
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 20
+          maximum: 50
+    responses:
+      '200':
+        description: Matching providers with service previews
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Federation.yaml#/FederatedSearchResult'
+      '401':
+        description: Missing or invalid HTTP Signature
+      '403':
+        description: Peer not registered or blocked
+
+'/obp/v1/federation/slots':
+  get:
+    operationId: federationSlots
+    summary: Federated slot query
+    description: |
+      Returns available slots for a service on this server.
+      Called by peer servers to check availability before federated booking.
+      Same logic as GET /obp/v1/slots but authenticated via HTTP Signature.
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    parameters:
+      - name: service_id
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: date_from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: date_to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+    responses:
+      '200':
+        description: Available slots
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    description: Slot (same schema as public /slots endpoint)
+      '401':
+        description: Missing or invalid HTTP Signature
+      '403':
+        description: Peer not registered or blocked
+
+'/obp/v1/federation/book':
+  post:
+    operationId: federationBook
+    summary: Create a federated booking
+    description: |
+      Creates a booking on this server on behalf of a user from a peer server.
+      The peer server is the "actor"; the customer is the end user.
+
+      The request body is a JSON-LD BookActivity signed with the peer's private key.
+      On success, returns the booking object. The peer should store the local
+      booking ID for later cancellation or reconciliation.
+
+      **Data minimization:** Only name, email, and optionally phone are stored.
+      The customer's home server URL is stored for federation tracking but not
+      exposed publicly.
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Federation.yaml#/FederatedBookingCreate'
+    responses:
+      '201':
+        description: Federated booking created
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Booking object with federated_from set
+      '409':
+        description: Slot no longer available
+      '401':
+        description: Missing or invalid HTTP Signature
+      '403':
+        description: Peer not registered or blocked
+
+'/obp/v1/federation/cancel':
+  post:
+    operationId: federationCancel
+    summary: Cancel a federated booking
+    description: |
+      Cancels a booking that was created via federation.
+      The request must be signed by the same peer server that created the booking.
+      The body is a JSON-LD CancelActivity.
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Federation.yaml#/FederatedBookingCancel'
+    responses:
+      '200':
+        description: Booking cancelled
+      '404':
+        description: Booking not found
+      '403':
+        description: Not authorized to cancel this booking (different peer)
+      '409':
+        description: Cannot cancel — booking already completed or no-show
+
+'/obp/v1/federation/sync':
+  get:
+    operationId: federationSync
+    summary: Catalog sync
+    description: |
+      Returns providers and services changed since the given timestamp.
+      Used by peer servers to maintain a local cache of this server's catalog.
+
+      **Sync strategy:**
+      - Peers pull sync on a configurable interval (default: 15 minutes)
+      - `trusted` peers may receive push notifications via webhook when catalog changes
+      - Deleted entities are included in the `deleted` arrays by ID
+      - Customer data is NEVER included in sync responses
+
+      On first sync, omit `since` to get the full catalog (paginated).
+    tags: [Federation]
+    security:
+      - HttpSignatureAuth: []
+    parameters:
+      - name: since
+        in: query
+        schema:
+          type: string
+          format: date-time
+        description: Only return entities changed after this timestamp. Omit for full sync.
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 100
+          maximum: 500
+    responses:
+      '200':
+        description: Changed catalog entries
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Federation.yaml#/SyncResponse'
+      '401':
+        description: Missing or invalid HTTP Signature
+      '403':
+        description: Peer not registered, blocked, or insufficient trust level

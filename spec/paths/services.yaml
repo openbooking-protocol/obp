@@ -1,0 +1,180 @@
+# Service endpoints
+# Tasks: 1.2.5, 1.2.6, 1.2.16, 1.2.17, 1.2.18
+
+'/obp/v1/services':
+  get:
+    operationId: listServices
+    summary: List services
+    description: |
+      Returns a paginated list of active services. Public endpoint.
+      Supports filtering by provider, category, and free-text search.
+    tags: [Services]
+    security: []
+    parameters:
+      - name: provider_id
+        in: query
+        schema:
+          type: string
+        description: Filter by provider ID
+      - name: category
+        in: query
+        schema:
+          $ref: '../components/schemas/Service.yaml#/ServiceCategory'
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 100
+        description: Full-text search across name and description
+      - name: max_duration_minutes
+        in: query
+        schema:
+          type: integer
+          minimum: 5
+      - name: max_price
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+        description: Maximum price in smallest currency unit
+      - name: currency
+        in: query
+        schema:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        description: Required when max_price is set
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: cursor
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Paginated list of services
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, pagination]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Service.yaml#/Service'
+                pagination:
+                  $ref: '../components/schemas/Common.yaml#/Pagination'
+
+  post:
+    operationId: createService
+    summary: Create a service
+    description: Add a new service to a provider. Requires provider API key.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Service.yaml#/ServiceCreate'
+    responses:
+      '201':
+        description: Service created
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Service.yaml#/Service'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/services/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Service ID
+
+  get:
+    operationId: getService
+    summary: Get service
+    description: Returns details of a single service. Public endpoint.
+    tags: [Services]
+    security: []
+    responses:
+      '200':
+        description: Service details
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Service.yaml#/Service'
+      '404':
+        description: Service not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  put:
+    operationId: updateService
+    summary: Update service
+    description: Update service details. Requires provider API key.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Service.yaml#/ServiceUpdate'
+    responses:
+      '200':
+        description: Updated service
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Service.yaml#/Service'
+      '404':
+        description: Service not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  delete:
+    operationId: deleteService
+    summary: Delete service
+    description: |
+      Soft-deletes a service (sets status to inactive).
+      Does not cancel existing bookings.
+      Hard delete is not supported in v1.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '204':
+        description: Service deleted
+      '404':
+        description: Service not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'

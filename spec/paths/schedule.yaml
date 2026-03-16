@@ -1,0 +1,83 @@
+# Schedule endpoint
+# Task: 1.2.19
+
+'/obp/v1/providers/{provider_id}/schedule':
+  parameters:
+    - name: provider_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Provider ID
+
+  get:
+    operationId: getSchedule
+    summary: Get provider or resource schedule
+    description: |
+      Returns the schedule for a provider or a specific resource.
+      If resource_id is not specified, returns the provider-level schedule.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [read]
+    parameters:
+      - name: resource_id
+        in: query
+        schema:
+          type: string
+        description: Get schedule for a specific resource instead of the provider
+    responses:
+      '200':
+        description: Schedule
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Schedule.yaml#/Schedule'
+      '404':
+        description: Provider or resource not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  put:
+    operationId: upsertSchedule
+    summary: Create or replace schedule
+    description: |
+      Creates or fully replaces the schedule for a provider or resource.
+      PUT semantics — the entire schedule (rules + exceptions) is replaced.
+      To add a single exception, fetch the current schedule, add the exception,
+      and PUT the full schedule back.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    parameters:
+      - name: resource_id
+        in: query
+        schema:
+          type: string
+        description: Set schedule for a specific resource
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Schedule.yaml#/ScheduleUpsert'
+    responses:
+      '200':
+        description: Schedule updated
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Schedule.yaml#/Schedule'
+      '201':
+        description: Schedule created
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Schedule.yaml#/Schedule'
+      '422':
+        description: Validation error (e.g. end_time <= start_time, duplicate day)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'

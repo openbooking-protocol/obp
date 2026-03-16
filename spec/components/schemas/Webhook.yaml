@@ -1,0 +1,148 @@
+# Webhook schema — OpenBooking Protocol
+# Tasks: 1.2.23 (CRUD), 1.2.24 (event types)
+
+WebhookEventType:
+  type: string
+  description: |
+    Event types that can trigger a webhook delivery.
+
+    | Event | Triggered when |
+    |-------|---------------|
+    | `booking.created` | A new booking is created (status: pending) |
+    | `booking.confirmed` | A booking is confirmed by the provider |
+    | `booking.cancelled` | A booking is cancelled by customer or provider |
+    | `booking.completed` | A booking is marked as completed |
+    | `booking.no_show` | A booking is marked as no-show |
+    | `slot.held` | A slot hold is created |
+    | `slot.released` | A slot hold expires or is released |
+  enum:
+    - booking.created
+    - booking.confirmed
+    - booking.cancelled
+    - booking.completed
+    - booking.no_show
+    - slot.held
+    - slot.released
+
+WebhookPayload:
+  type: object
+  description: |
+    Payload delivered to the webhook URL via HTTP POST.
+    The request body is signed with HMAC-SHA256 using the webhook secret.
+    Signature is included in the `X-OBP-Signature` header:
+      `X-OBP-Signature: sha256=<hex_digest>`
+  required:
+    - id
+    - event
+    - created_at
+    - data
+  properties:
+    id:
+      type: string
+      description: Unique delivery ID (idempotency key for retries)
+      example: "wdl_ev7mnopq"
+    event:
+      $ref: '#/WebhookEventType'
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+    data:
+      type: object
+      description: |
+        Event-specific payload:
+        - For booking.* events: the full Booking object
+        - For slot.* events: the Slot object + hold info
+
+Webhook:
+  type: object
+  description: |
+    A Webhook registration. When a matching event occurs, OBP makes an HTTP POST
+    request to the registered URL with the event payload signed by HMAC-SHA256.
+
+    **Retry policy:** On delivery failure (non-2xx response or timeout),
+    OBP retries with exponential backoff: 1m, 5m, 30m, 2h, 8h (5 attempts total).
+    After 5 failures, the webhook is marked `suspended`. The provider must
+    reactivate it via PATCH /webhooks/{id}.
+
+    **Security:** The `secret` is shown only once at creation time. Store it securely.
+    Verify the `X-OBP-Signature` header on every delivery.
+  required:
+    - id
+    - provider_id
+    - url
+    - events
+    - active
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique webhook identifier (prefix `whk_`)
+      example: "whk_r2s5tuvw"
+      readOnly: true
+    provider_id:
+      type: string
+      example: "prv_k3j9mxyz"
+    url:
+      type: string
+      format: uri
+      description: HTTPS URL to deliver payloads to
+      example: "https://my-app.example.com/webhooks/obp"
+    events:
+      type: array
+      items:
+        $ref: '#/WebhookEventType'
+      minItems: 1
+      description: Event types this webhook subscribes to
+      example: ["booking.created", "booking.cancelled"]
+    active:
+      type: boolean
+      description: |
+        Whether the webhook is enabled. Set to false automatically after
+        5 consecutive delivery failures (suspended).
+      example: true
+    secret:
+      type: string
+      description: |
+        HMAC-SHA256 signing secret. **Returned only at creation time** — never again.
+        Generate a new secret via POST /webhooks/{id}/rotate-secret.
+      writeOnly: true
+      example: "whsec_abc123..."
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+
+WebhookCreate:
+  type: object
+  required:
+    - url
+    - events
+  properties:
+    url:
+      type: string
+      format: uri
+      example: "https://my-app.example.com/webhooks/obp"
+    events:
+      type: array
+      items:
+        $ref: '#/WebhookEventType'
+      minItems: 1
+      example: ["booking.created", "booking.cancelled"]
+
+WebhookResponse:
+  allOf:
+    - $ref: '#/Webhook'
+    - type: object
+      properties:
+        secret:
+          type: string
+          description: Only present in the creation response
+          example: "whsec_abc123..."
+
+# Validation rules:
+# - url must use HTTPS (enforced in production, HTTP allowed in development)
+# - events array must not be empty
+# - Maximum 10 webhooks per provider
+# - Duplicate urls per provider are rejected

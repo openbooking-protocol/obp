@@ -1,0 +1,182 @@
+# Webhook endpoints
+# Tasks: 1.2.23 (CRUD), 1.2.24 (event types defined in Webhook.yaml)
+
+'/obp/v1/webhooks':
+  get:
+    operationId: listWebhooks
+    summary: List webhooks
+    description: Returns all registered webhooks for the authenticated provider.
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [read]
+    responses:
+      '200':
+        description: List of webhooks
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Webhook.yaml#/Webhook'
+
+  post:
+    operationId: createWebhook
+    summary: Register a webhook
+    description: |
+      Registers a new webhook endpoint for the authenticated provider.
+      The response includes the signing secret — **store it securely**.
+      It will not be shown again.
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [write]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Webhook.yaml#/WebhookCreate'
+    responses:
+      '201':
+        description: |
+          Webhook registered. The `secret` field is included only in this response.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Webhook.yaml#/WebhookResponse'
+      '409':
+        description: Webhook URL already registered for this provider
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/webhooks/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Webhook ID
+
+  get:
+    operationId: getWebhook
+    summary: Get webhook
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [read]
+    responses:
+      '200':
+        description: Webhook details (secret not included)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Webhook.yaml#/Webhook'
+      '404':
+        description: Webhook not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  patch:
+    operationId: updateWebhook
+    summary: Update webhook
+    description: Update webhook URL, events, or active status.
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [write]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              url:
+                type: string
+                format: uri
+              events:
+                type: array
+                items:
+                  $ref: '../components/schemas/Webhook.yaml#/WebhookEventType'
+                minItems: 1
+              active:
+                type: boolean
+    responses:
+      '200':
+        description: Webhook updated
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Webhook.yaml#/Webhook'
+      '404':
+        description: Webhook not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+  delete:
+    operationId: deleteWebhook
+    summary: Delete webhook
+    description: Permanently removes a webhook registration.
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '204':
+        description: Webhook deleted
+      '404':
+        description: Webhook not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/webhooks/{id}/rotate-secret':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  post:
+    operationId: rotateWebhookSecret
+    summary: Rotate webhook secret
+    description: |
+      Generates a new signing secret for the webhook.
+      The old secret is immediately invalidated.
+      The new secret is returned only in this response.
+    tags: [Webhooks]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '200':
+        description: New secret generated
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [secret]
+              properties:
+                secret:
+                  type: string
+                  example: "whsec_newSecret456..."
+      '404':
+        description: Webhook not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'

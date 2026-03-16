@@ -1,0 +1,11 @@
+{
+  "id": "res_ana_p",
+  "provider_id": "prv_k3j9mxyz",
+  "name": "Ana Petrović",
+  "description": "Senior stilist sa 8 godina iskustva. Specijalizovana za bojenje kose i moderne frizure.",
+  "type": "staff",
+  "avatar_url": "https://cdn.example.com/staff/ana.jpg",
+  "status": "active",
+  "created_at": "2026-03-01T10:02:00Z",
+  "updated_at": "2026-03-01T10:02:00Z"
+}

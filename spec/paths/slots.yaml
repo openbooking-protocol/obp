@@ -1,0 +1,162 @@
+# Slot endpoints
+# Tasks: 1.2.7, 1.2.8, 1.2.9
+
+'/obp/v1/slots':
+  get:
+    operationId: listSlots
+    summary: List available slots
+    description: |
+      Returns available time slots for a service within a date range.
+      Slots are computed on-the-fly from the provider's schedule and existing bookings.
+      Public endpoint — no authentication required.
+
+      **Performance note:** Limit date ranges to 30 days. Larger ranges may result
+      in slower responses. The server may enforce this limit.
+    tags: [Availability]
+    security: []
+    parameters:
+      - name: service_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: Service to check availability for
+      - name: date_from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Start of the date range (YYYY-MM-DD, inclusive)
+        example: "2026-04-01"
+      - name: date_to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: End of the date range (YYYY-MM-DD, inclusive, max 30 days from date_from)
+        example: "2026-04-07"
+      - name: timezone
+        in: query
+        schema:
+          type: string
+        description: |
+          IANA timezone for interpreting date_from/date_to as local dates.
+          Defaults to the service's provider timezone.
+        example: "Europe/Belgrade"
+      - name: resource_id
+        in: query
+        schema:
+          type: string
+        description: Filter slots to those served by a specific resource (e.g., specific staff)
+    responses:
+      '200':
+        description: List of available slots
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Slot.yaml#/Slot'
+                  description: Slots ordered by start_at ascending
+      '400':
+        description: Invalid parameters (e.g. date_to before date_from, range > 30 days)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Service not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/slots/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Slot ID
+
+  get:
+    operationId: getSlot
+    summary: Get slot
+    description: |
+      Returns the current status of a slot, including whether it is held.
+      Public endpoint — use to poll hold status before booking.
+    tags: [Availability]
+    security: []
+    responses:
+      '200':
+        description: Slot details
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Slot.yaml#/Slot'
+      '404':
+        description: Slot not found or outside schedule
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/slots/{id}/hold':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Slot ID to hold
+
+  post:
+    operationId: holdSlot
+    summary: Hold a slot
+    description: |
+      Temporarily reserves a slot to prevent others from booking it while
+      the customer completes the booking form.
+
+      - Uses Redis SETNX for atomic, race-free hold creation
+      - Returns 409 if the slot is already held or booked
+      - The hold expires automatically at `expires_at`
+      - A session can hold at most one slot per service at a time;
+        holding a new slot releases any previous hold for the same service
+    tags: [Availability]
+    security: []
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Slot.yaml#/SlotHoldRequest'
+    responses:
+      '200':
+        description: Hold created
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Slot.yaml#/SlotHoldResponse'
+      '409':
+        description: Slot already held or booked
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+            example:
+              type: "https://obp.dev/errors/slot-unavailable"
+              title: "Slot is no longer available"
+              status: 409
+              detail: "Slot slt_9xkr2mwp is currently held by another session."
+      '404':
+        description: Slot not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'

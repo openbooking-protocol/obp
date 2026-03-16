@@ -1,0 +1,120 @@
+# Common / shared schema components used across OBP entities
+
+Money:
+  type: object
+  description: Monetary amount with ISO 4217 currency code
+  required: [amount, currency]
+  properties:
+    amount:
+      type: number
+      format: decimal
+      minimum: 0
+      description: Amount in the smallest unit (e.g. 1500 = 15.00 EUR)
+      example: 1500
+    currency:
+      type: string
+      pattern: '^[A-Z]{3}$'
+      description: ISO 4217 currency code
+      example: EUR
+
+Address:
+  type: object
+  description: Physical address
+  properties:
+    street:
+      type: string
+      maxLength: 255
+      example: "Knez Mihailova 10"
+    city:
+      type: string
+      maxLength: 100
+      example: "Belgrade"
+    state:
+      type: string
+      maxLength: 100
+      example: "Central Serbia"
+    postal_code:
+      type: string
+      maxLength: 20
+      example: "11000"
+    country:
+      type: string
+      pattern: '^[A-Z]{2}$'
+      description: ISO 3166-1 alpha-2 country code
+      example: "RS"
+    latitude:
+      type: number
+      format: float
+      minimum: -90
+      maximum: 90
+      example: 44.8186
+    longitude:
+      type: number
+      format: float
+      minimum: -180
+      maximum: 180
+      example: 20.4606
+
+Pagination:
+  type: object
+  description: Cursor-based pagination metadata
+  required: [has_more]
+  properties:
+    next_cursor:
+      type: string
+      nullable: true
+      description: Opaque cursor for the next page; null if no more pages
+      example: "eyJpZCI6MTAwfQ=="
+    has_more:
+      type: boolean
+      example: true
+
+PaginatedResponse:
+  type: object
+  required: [data, pagination]
+  properties:
+    data:
+      type: array
+      items: {}
+    pagination:
+      $ref: '#/Pagination'
+
+Problem:
+  type: object
+  description: RFC 7807 Problem Details
+  required: [type, title, status]
+  properties:
+    type:
+      type: string
+      format: uri
+      example: "https://obp.dev/errors/slot-unavailable"
+    title:
+      type: string
+      example: "Slot is no longer available"
+    status:
+      type: integer
+      example: 409
+    detail:
+      type: string
+      example: "Slot slt_abc123 was booked by another customer."
+    instance:
+      type: string
+      format: uri
+      example: "/obp/v1/bookings"
+
+ISODateTime:
+  type: string
+  format: date-time
+  description: RFC 3339 / ISO 8601 datetime with timezone offset
+  example: "2026-04-01T10:00:00+02:00"
+
+IANATimezone:
+  type: string
+  description: IANA timezone identifier
+  example: "Europe/Belgrade"
+  pattern: '^[A-Za-z]+(/[A-Za-z_]+)*$'
+
+OBPId:
+  type: string
+  description: Unique OBP identifier (prefixed nanoid)
+  example: "prv_k3j9mxyz"

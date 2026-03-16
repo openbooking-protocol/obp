@@ -1,0 +1,40 @@
+extends:
+  - "@stoplight/spectral-rulesets/oas"
+
+rules:
+  # Enforce OpenAPI 3.1
+  oas3-valid-media-example: error
+  oas3-unused-component: warn
+
+  # OBP custom rules
+  obp-operation-id:
+    description: All operations must have an operationId
+    given: "$.paths[*][*]"
+    severity: error
+    then:
+      field: operationId
+      function: truthy
+
+  obp-response-description:
+    description: All responses must have a description
+    given: "$.paths[*][*].responses[*]"
+    severity: error
+    then:
+      field: description
+      function: truthy
+
+  obp-tags-required:
+    description: All operations must have at least one tag
+    given: "$.paths[*][*]"
+    severity: warn
+    then:
+      field: tags
+      function: truthy
+
+  obp-error-schema:
+    description: Error responses (4xx, 5xx) must use RFC 7807 Problem Details
+    given: "$.paths[*][*].responses[?(@property >= '400')]"
+    severity: warn
+    then:
+      field: content
+      function: truthy

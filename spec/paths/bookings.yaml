@@ -1,0 +1,331 @@
+# Booking endpoints
+# Tasks: 1.2.10, 1.2.11, 1.2.12, 1.2.13, 1.2.20, 1.2.21, 1.2.22
+
+'/obp/v1/bookings':
+  get:
+    operationId: listBookings
+    summary: List bookings
+    description: |
+      Returns a paginated list of bookings for the authenticated provider.
+      Requires provider API key (read scope).
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [read]
+    parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '../components/schemas/Booking.yaml#/BookingStatus'
+        description: Filter by booking status
+      - name: service_id
+        in: query
+        schema:
+          type: string
+      - name: date_from
+        in: query
+        schema:
+          type: string
+          format: date
+        description: Filter bookings with start_at >= date_from
+        example: "2026-04-01"
+      - name: date_to
+        in: query
+        schema:
+          type: string
+          format: date
+        description: Filter bookings with start_at <= date_to
+        example: "2026-04-30"
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: cursor
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Paginated list of bookings
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data, pagination]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Booking.yaml#/Booking'
+                pagination:
+                  $ref: '../components/schemas/Common.yaml#/Pagination'
+
+  post:
+    operationId: createBooking
+    summary: Create a booking
+    description: |
+      Creates a new booking for the specified slot.
+
+      **Race condition protection:**
+      Uses `SELECT ... FOR UPDATE` on affected resources + optimistic locking
+      on the slot. If the slot was booked between the hold and booking creation,
+      returns 409.
+
+      **Hold behavior:**
+      - If a hold exists for the slot (from this or another session), it is released
+        upon successful booking
+      - If no hold exists, the booking is created directly (allowed but not recommended —
+        clients should always hold first)
+    tags: [Bookings]
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Booking.yaml#/BookingCreate'
+    responses:
+      '201':
+        description: Booking created (status: pending)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '409':
+        description: Slot no longer available (booked by another customer)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+            example:
+              type: "https://obp.dev/errors/slot-unavailable"
+              title: "Slot is no longer available"
+              status: 409
+              detail: "Slot slt_9xkr2mwp was booked by another customer."
+      '422':
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/bookings/{id}':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Booking ID
+
+  get:
+    operationId: getBooking
+    summary: Get booking
+    description: |
+      Returns booking details.
+      Accessible by the customer (via booking_id + email verification)
+      or by the provider (via API key).
+    tags: [Bookings]
+    security:
+      - {}
+      - ApiKeyAuth: [read]
+    parameters:
+      - name: customer_email
+        in: query
+        schema:
+          type: string
+          format: email
+        description: |
+          Required when accessing without API key. Must match the booking's customer email.
+    responses:
+      '200':
+        description: Booking details
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '403':
+        description: Access denied (wrong email or missing API key)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Booking not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/bookings/{id}/confirm':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  post:
+    operationId: confirmBooking
+    summary: Confirm booking
+    description: |
+      Transitions booking from `pending` to `confirmed`.
+      Only the provider can confirm a booking.
+      Triggers `booking.confirmed` webhook event.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '200':
+        description: Booking confirmed
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '409':
+        description: Invalid status transition
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Booking not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/bookings/{id}/cancel':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  post:
+    operationId: cancelBooking
+    summary: Cancel booking
+    description: |
+      Transitions booking to `cancelled`.
+      Can be called by the customer (no auth, but requires customer_email)
+      or by the provider (API key). Triggers `booking.cancelled` webhook event.
+    tags: [Bookings]
+    security:
+      - {}
+      - ApiKeyAuth: [write]
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/Booking.yaml#/BookingCancel'
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: customer_email
+        in: query
+        schema:
+          type: string
+          format: email
+        description: Required when cancelling without API key
+    responses:
+      '200':
+        description: Booking cancelled
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '409':
+        description: Invalid status transition
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Booking not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/bookings/{id}/complete':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  post:
+    operationId: completeBooking
+    summary: Mark booking as completed
+    description: |
+      Transitions booking from `confirmed` to `completed`.
+      Only the provider can complete a booking.
+      Triggers `booking.completed` webhook event.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '200':
+        description: Booking completed
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '409':
+        description: Invalid status transition
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Booking not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+
+'/obp/v1/bookings/{id}/no-show':
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  post:
+    operationId: noShowBooking
+    summary: Mark booking as no-show
+    description: |
+      Transitions booking from `confirmed` to `no_show`.
+      Only the provider can mark a no-show.
+      Only allowed after the slot's `start_at` has passed.
+      Triggers `booking.no_show` webhook event.
+    tags: [Provider management]
+    security:
+      - ApiKeyAuth: [write]
+    responses:
+      '200':
+        description: Booking marked as no-show
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Booking.yaml#/Booking'
+      '409':
+        description: Invalid transition (booking not confirmed, or slot hasn't started yet)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'
+      '404':
+        description: Booking not found
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Common.yaml#/Problem'

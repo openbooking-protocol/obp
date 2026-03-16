@@ -1,0 +1,119 @@
+# Slot schema — OpenBooking Protocol
+# Tasks: 1.1.10 (schema), 1.1.11 (generation), 1.1.12 (hold), 1.1.13 (conflict resolution)
+
+SlotStatus:
+  type: string
+  enum: [available, held, booked]
+  description: |
+    - `available` — can be held or booked
+    - `held` — temporarily reserved (Redis TTL); cannot be booked by others until hold expires
+    - `booked` — a confirmed or pending booking exists for this slot
+
+Slot:
+  type: object
+  description: |
+    A Slot represents a specific available time window for a Service.
+
+    **Generation:**
+    Slots are generated on-the-fly from the Schedule and existing bookings.
+    They are NOT pre-persisted in the database. The GET /slots endpoint computes
+    availability dynamically for the requested date range.
+
+    **Hold mechanism:**
+    A hold is a Redis key `hold:{slot_id}` with a TTL (default: 10 min).
+    While a hold exists, the slot is in `held` status and cannot be held by others.
+    If no booking is created before TTL expiry, the slot returns to `available`.
+    Only one hold per slot at any given time.
+
+    **Conflict resolution:**
+    A slot is considered conflicted (unavailable) if ANY of the following are true:
+    1. An active hold exists for the slot in Redis
+    2. A non-cancelled Booking exists for any of the Service's required Resources
+       whose time range overlaps [start_at, end_at)
+    3. A ScheduleException marks the date as `closed`
+    Conflict checks use half-open intervals: [start_at, end_at).
+    Two slots are overlapping if: slotA.start_at < slotB.end_at AND slotA.end_at > slotB.start_at
+
+  required:
+    - id
+    - provider_id
+    - service_id
+    - start_at
+    - end_at
+    - status
+  properties:
+    id:
+      type: string
+      description: |
+        Deterministic slot identifier derived from service_id + start_at.
+        Format: `slt_{base62(sha256(service_id:start_at_utc)[:8])}`
+        Deterministic IDs allow clients to reference slots without prior listing.
+      example: "slt_9xkr2mwp"
+      readOnly: true
+    provider_id:
+      type: string
+      example: "prv_k3j9mxyz"
+    service_id:
+      type: string
+      example: "svc_h7k2pqrs"
+    resource_ids:
+      type: array
+      items:
+        type: string
+      description: Resources that will be occupied during this slot
+      example: ["res_ana_p", "res_chair_1"]
+    start_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      description: Slot start time (UTC)
+      example: "2026-04-01T08:00:00Z"
+    end_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      description: Slot end time (UTC) = start_at + service.duration_minutes
+      example: "2026-04-01T08:30:00Z"
+    status:
+      $ref: '#/SlotStatus'
+    hold_expires_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      nullable: true
+      description: When the current hold expires. Null if status != held.
+      example: "2026-04-01T07:15:00Z"
+
+SlotHoldRequest:
+  type: object
+  description: Request body for POST /slots/{id}/hold
+  properties:
+    ttl_seconds:
+      type: integer
+      minimum: 60
+      maximum: 1800
+      default: 600
+      description: |
+        Requested hold duration in seconds. Server may override with its own limit.
+        Default and maximum values are server-configurable.
+      example: 600
+
+SlotHoldResponse:
+  type: object
+  required:
+    - slot_id
+    - expires_at
+  properties:
+    slot_id:
+      type: string
+      example: "slt_9xkr2mwp"
+    expires_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      description: Absolute datetime when the hold expires
+      example: "2026-04-01T07:15:00Z"
+
+# Conflict resolution priority (highest to lowest):
+# 1. ScheduleException type=closed — whole day blocked
+# 2. Active Redis hold by another session
+# 3. Overlapping non-cancelled booking on any required resource
+# 4. Slot falls outside RecurringRule window
+# 5. Slot falls in DST gap (skipped)
+#
+# Note: hold conflicts are checked atomically using Redis SET NX (SETNX).
+# The booking creation endpoint re-checks conflicts using a PostgreSQL
+# SELECT ... FOR UPDATE on the booking row + resource availability view,
+# providing optimistic locking as a final safety net.

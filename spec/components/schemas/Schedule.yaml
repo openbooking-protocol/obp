@@ -1,0 +1,187 @@
+# Schedule schema — OpenBooking Protocol
+# Tasks: 1.1.18 (schema), 1.1.19 (slot generation), 1.1.20 (timezone handling)
+
+DayOfWeek:
+  type: string
+  enum: [mon, tue, wed, thu, fri, sat, sun]
+
+TimeOfDay:
+  type: string
+  pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+  description: Wall-clock time in HH:MM format (24-hour, provider's local timezone)
+  example: "09:00"
+
+RecurringRule:
+  type: object
+  description: |
+    A recurring availability window for a specific day of the week.
+    Times are in the provider's (or resource's) local timezone.
+  required:
+    - day_of_week
+    - start_time
+    - end_time
+  properties:
+    day_of_week:
+      $ref: '#/DayOfWeek'
+    start_time:
+      $ref: '#/TimeOfDay'
+    end_time:
+      $ref: '#/TimeOfDay'
+      description: Must be strictly after start_time. Use "24:00" is NOT valid — use "23:59".
+
+ScheduleExceptionType:
+  type: string
+  enum: [closed, custom_hours]
+  description: |
+    - `closed` — the provider/resource is unavailable all day
+    - `custom_hours` — open for different hours than the recurring rule
+
+ScheduleException:
+  type: object
+  description: |
+    Overrides the recurring schedule for a specific calendar date.
+    Exceptions take precedence over RecurringRules.
+  required:
+    - date
+    - type
+  properties:
+    date:
+      type: string
+      format: date
+      description: The calendar date this exception applies to (YYYY-MM-DD)
+      example: "2026-12-31"
+    type:
+      $ref: '#/ScheduleExceptionType'
+    start_time:
+      $ref: '#/TimeOfDay'
+      description: Required when type is `custom_hours`
+      example: "10:00"
+    end_time:
+      $ref: '#/TimeOfDay'
+      description: Required when type is `custom_hours`
+      example: "14:00"
+    note:
+      type: string
+      maxLength: 200
+      nullable: true
+      description: Internal note (not shown to customers)
+      example: "Nova godina — radno do 14h"
+
+Schedule:
+  type: object
+  description: |
+    A Schedule defines when a Provider or Resource is available.
+
+    **Scope:**
+    - Provider-level schedule (`resource_id: null`): fallback for services with no resources
+    - Resource-level schedule (`resource_id: <id>`): overrides provider schedule for that resource
+
+    **Slot generation algorithm:**
+    1. For each day in the generation window:
+       a. Check for a ScheduleException on that date — apply if found
+       b. Otherwise, find the RecurringRule for that day_of_week
+       c. If no rule exists, the day is unavailable
+    2. Within the available window, generate slots of duration = service.duration_minutes
+       starting from start_time, stepping by duration_minutes + buffer_minutes
+    3. Exclude any slot whose time range overlaps an existing non-cancelled booking
+       for any of the service's required resources
+
+    **Timezone handling:**
+    - All times in RecurringRules and Exceptions are in the Schedule's `timezone`
+    - Slot `start_at` and `end_at` are always stored and returned as UTC (ISO 8601)
+    - DST transitions are handled by interpreting wall-clock times in the local timezone;
+      if a slot would fall in a DST gap, it is skipped
+    - The `timezone` field defaults to the Provider's timezone if not set
+  required:
+    - id
+    - provider_id
+    - timezone
+    - rules
+    - exceptions
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique schedule identifier (prefix `sch_`)
+      example: "sch_m2n8prst"
+      readOnly: true
+    provider_id:
+      type: string
+      example: "prv_k3j9mxyz"
+    resource_id:
+      type: string
+      nullable: true
+      description: |
+        If set, this schedule applies to a specific Resource.
+        If null, this is the Provider-level schedule.
+      example: "res_ana_p"
+    timezone:
+      $ref: 'Common.yaml#/IANATimezone'
+    rules:
+      type: array
+      description: Recurring weekly availability rules
+      items:
+        $ref: '#/RecurringRule'
+      example:
+        - day_of_week: mon
+          start_time: "09:00"
+          end_time: "18:00"
+        - day_of_week: tue
+          start_time: "09:00"
+          end_time: "18:00"
+        - day_of_week: wed
+          start_time: "09:00"
+          end_time: "18:00"
+        - day_of_week: thu
+          start_time: "09:00"
+          end_time: "18:00"
+        - day_of_week: fri
+          start_time: "09:00"
+          end_time: "17:00"
+    exceptions:
+      type: array
+      description: Date-specific overrides
+      items:
+        $ref: '#/ScheduleException'
+      example:
+        - date: "2026-01-01"
+          type: closed
+          note: "Nova godina"
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+
+ScheduleUpsert:
+  type: object
+  description: Create or replace a schedule (PUT semantics)
+  required:
+    - timezone
+    - rules
+  properties:
+    resource_id:
+      type: string
+      nullable: true
+    timezone:
+      $ref: 'Common.yaml#/IANATimezone'
+    rules:
+      type: array
+      items:
+        $ref: '#/RecurringRule'
+    exceptions:
+      type: array
+      items:
+        $ref: '#/ScheduleException'
+      default: []
+
+# Validation rules:
+# - Each day_of_week may appear at most once per schedule (no split shifts in v1)
+# - end_time must be > start_time
+# - exception.start_time required iff type == custom_hours
+# - Duplicate exception dates are rejected (last-write-wins not allowed; client must DELETE first)
+# - Timezone must be a valid IANA identifier (validated against tzdata)
+# - A provider must have exactly one provider-level schedule (resource_id: null)
+# - A resource may have at most one schedule

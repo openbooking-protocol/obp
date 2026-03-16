@@ -1,0 +1,2384 @@
+openapi: 3.1.0
+
+info:
+  title: OpenBooking Protocol API
+  version: 1.0.0
+  description: |
+    # OpenBooking Protocol (OBP)
+
+    An open, federated protocol for scheduling and booking services.
+
+    ## Authentication
+
+    | Method | Header | Scope | Used for |
+    |--------|--------|-------|---------|
+    | API Key | `X-Api-Key: <key>` | `read`, `write`, `admin` | Provider management |
+    | Bearer token | `Authorization: Bearer <token>` | — | OAuth2 end-user flows |
+    | HTTP Signature | `Signature` + `Signature-Input` headers | — | Server-to-server federation (RFC 9421, Ed25519) |
+    | None | — | — | Public discovery & booking endpoints |
+
+    ## Error format
+
+    All errors follow [RFC 7807 Problem Details](https://datatracker.ietf.org/doc/html/rfc7807):
+
+    ```json
+    {
+      "type": "https://obp.dev/errors/slot-unavailable",
+      "title": "Slot is no longer available",
+      "status": 409,
+      "detail": "Slot slt_9xkr2mwp was booked by another customer.",
+      "instance": "/obp/v1/bookings"
+    }
+    ```
+
+    ## Pagination
+
+    List endpoints use cursor-based pagination:
+    ```
+    GET /obp/v1/services?limit=20&cursor=eyJpZCI6MTAwfQ==
+    ```
+
+    ## Rate limiting
+
+    Every response includes rate limit headers:
+
+    | Header | Description |
+    |--------|-------------|
+    | `X-RateLimit-Limit` | Requests allowed per window |
+    | `X-RateLimit-Remaining` | Requests remaining in current window |
+    | `X-RateLimit-Reset` | Unix timestamp when the window resets |
+
+    On `429 Too Many Requests`, also includes:
+    - `Retry-After: <seconds>`
+
+  contact:
+    name: OBP Project
+    url: https://github.com/openbooking-protocol/obp
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  - url: https://{host}/obp/v1
+    description: OBP server
+    variables:
+      host:
+        default: obp.example.com
+        description: OBP server hostname
+  - url: http://localhost:3000/obp/v1
+    description: Local development
+
+tags:
+  - name: Discovery
+    description: Public endpoints for discovering servers, providers, and categories
+  - name: Services
+    description: Browse available services
+  - name: Availability
+    description: Check slot availability and hold slots
+  - name: Bookings
+    description: Create and manage bookings
+  - name: Provider management
+    description: Authenticated endpoints for providers to manage their data
+  - name: Webhooks
+    description: Register and manage webhook endpoints
+  - name: Federation
+    description: |
+      Server-to-server federation endpoints. All requests must be signed with
+      the peer server's Ed25519 private key (HTTP Signatures, RFC 9421).
+      Peer must be registered and have status `active`.
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # ── Discovery ──────────────────────────────────────────────────────────────
+  /.well-known/obp:
+    get:
+      operationId: getWellKnownObp
+      summary: OBP server discovery
+      description: |
+        Returns the OBP server's discovery document. Used by clients and peer
+        servers to discover capabilities, federation endpoints, and the server's
+        Ed25519 public key. Must be publicly accessible with no authentication.
+      tags: [Discovery]
+      security: []
+      responses:
+        '200':
+          description: OBP server discovery document
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControl'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OBPDiscoveryDocument'
+              example:
+                version: "1.0"
+                server:
+                  name: "My OBP Server"
+                  url: "https://obp.example.com"
+                  public_key:
+                    algorithm: "Ed25519"
+                    value: "MCowBQYDK2VdAyEA..."
+                capabilities:
+                  federation: true
+                  webhooks: true
+                  ical_export: true
+                  oauth2: true
+                api:
+                  version: "1"
+                  base_url: "/obp/v1"
+
+  # ── Providers ──────────────────────────────────────────────────────────────
+  /providers:
+    get:
+      operationId: listProviders
+      summary: List providers
+      description: Paginated list of active providers on this server. Public endpoint.
+      tags: [Discovery]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/QueryCategory'
+        - $ref: '#/components/parameters/QueryQ'
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Paginated list of providers
+          headers:
+            $ref: '#/components/headers/RateLimitHeaders'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Provider'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      operationId: createProvider
+      summary: Create a provider
+      description: Register a new provider. Requires admin API key.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderCreate'
+      responses:
+        '201':
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /providers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getProvider
+      summary: Get provider
+      description: Provider details including address, timezone, and category. Public.
+      tags: [Discovery]
+      security: []
+      responses:
+        '200':
+          description: Provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateProvider
+      summary: Update provider
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderUpdate'
+      responses:
+        '200':
+          description: Updated provider
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /categories:
+    get:
+      operationId: listCategories
+      summary: List supported categories
+      description: All supported provider and service categories. Public endpoint.
+      tags: [Discovery]
+      security: []
+      responses:
+        '200':
+          description: Category lists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider_categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          $ref: '#/components/schemas/ProviderCategory'
+                        label:
+                          type: string
+                  service_categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          $ref: '#/components/schemas/ServiceCategory'
+                        label:
+                          type: string
+
+  # ── Services ───────────────────────────────────────────────────────────────
+  /services:
+    get:
+      operationId: listServices
+      summary: List services
+      description: Paginated list of active services. Public endpoint.
+      tags: [Services]
+      security: []
+      parameters:
+        - name: provider_id
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ServiceCategory'
+        - $ref: '#/components/parameters/QueryQ'
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Paginated list of services
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      operationId: createService
+      summary: Create a service
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceCreate'
+      responses:
+        '201':
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /services/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getService
+      summary: Get service
+      tags: [Services]
+      security: []
+      responses:
+        '200':
+          description: Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateService
+      summary: Update service
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceUpdate'
+      responses:
+        '200':
+          description: Updated service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deleteService
+      summary: Delete (deactivate) service
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '204':
+          description: Service deactivated
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Slots ──────────────────────────────────────────────────────────────────
+  /slots:
+    get:
+      operationId: listSlots
+      summary: List available slots
+      description: |
+        Computes available time slots on-the-fly from the provider's schedule
+        and existing bookings. Date range limited to 30 days.
+      tags: [Availability]
+      security: []
+      parameters:
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: svc_h7k2pqrs
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-04-07"
+        - name: timezone
+          in: query
+          schema:
+            type: string
+          example: "Europe/Belgrade"
+        - name: resource_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available slots ordered by start_at
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Slot'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /slots/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getSlot
+      summary: Get slot status
+      tags: [Availability]
+      security: []
+      responses:
+        '200':
+          description: Slot with current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Slot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /slots/{id}/hold:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: holdSlot
+      summary: Hold a slot
+      description: |
+        Atomically reserves a slot using Redis SETNX. Returns 409 if already held.
+        Hold expires automatically at `expires_at`.
+      tags: [Availability]
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotHoldRequest'
+      responses:
+        '200':
+          description: Hold created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotHoldResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  # ── Bookings ───────────────────────────────────────────────────────────────
+  /bookings:
+    get:
+      operationId: listBookings
+      summary: List bookings
+      description: Provider's bookings. Requires API key.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [read]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/BookingStatus'
+        - name: service_id
+          in: query
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/QueryLimit'
+        - $ref: '#/components/parameters/QueryCursor'
+      responses:
+        '200':
+          description: Paginated bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      operationId: createBooking
+      summary: Create a booking
+      description: |
+        Creates a booking for a slot. Uses optimistic locking — returns 409 on race.
+        Releases the slot hold (if any) on success.
+      tags: [Bookings]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+      responses:
+        '201':
+          description: Booking created (status: pending)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /bookings/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getBooking
+      summary: Get booking
+      description: |
+        Provider access requires API key. Customer access requires matching `customer_email` query param.
+      tags: [Bookings]
+      security:
+        - {}
+        - ApiKeyAuth: [read]
+      parameters:
+        - name: customer_email
+          in: query
+          schema:
+            type: string
+            format: email
+          description: Required when accessing without API key
+      responses:
+        '200':
+          description: Booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /bookings/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: confirmBooking
+      summary: Confirm booking
+      description: Transitions `pending → confirmed`. Provider only. Triggers webhook.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '200':
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /bookings/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: cancelBooking
+      summary: Cancel booking
+      description: Cancellable by customer (with email) or provider (with API key).
+      tags: [Bookings]
+      security:
+        - {}
+        - ApiKeyAuth: [write]
+      parameters:
+        - name: customer_email
+          in: query
+          schema:
+            type: string
+            format: email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCancel'
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /bookings/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: completeBooking
+      summary: Mark booking as completed
+      description: Transitions `confirmed → completed`. Provider only.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '200':
+          description: Booking completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /bookings/{id}/no-show:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: noShowBooking
+      summary: Mark booking as no-show
+      description: Transitions `confirmed → no_show`. Provider only. Only after slot start_at.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '200':
+          description: Booking marked no-show
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ── Schedule ───────────────────────────────────────────────────────────────
+  /providers/{provider_id}/schedule:
+    parameters:
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: resource_id
+        in: query
+        schema:
+          type: string
+        description: Target a specific resource's schedule
+    get:
+      operationId: getSchedule
+      summary: Get schedule
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [read]
+      responses:
+        '200':
+          description: Schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: upsertSchedule
+      summary: Create or replace schedule
+      description: |
+        Full replacement (PUT semantics). Fetch, modify, then PUT back to update.
+      tags: [Provider management]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleUpsert'
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ── Webhooks ───────────────────────────────────────────────────────────────
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List webhooks
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [read]
+      responses:
+        '200':
+          description: Webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+    post:
+      operationId: createWebhook
+      summary: Register a webhook
+      description: |
+        The response includes the signing `secret` — **returned only once**.
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookCreate'
+      responses:
+        '201':
+          description: Webhook registered (secret included)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /webhooks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getWebhook
+      summary: Get webhook
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [read]
+      responses:
+        '200':
+          description: Webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateWebhook
+      summary: Update webhook
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WebhookEventType'
+                  minItems: 1
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteWebhook
+      summary: Delete webhook
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhooks/{id}/rotate-secret:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    post:
+      operationId: rotateWebhookSecret
+      summary: Rotate webhook secret
+      tags: [Webhooks]
+      security:
+        - ApiKeyAuth: [write]
+      responses:
+        '200':
+          description: New secret
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret]
+                properties:
+                  secret:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Federation ─────────────────────────────────────────────────────────────
+  /.well-known/webfinger:
+    get:
+      operationId: webfinger
+      summary: WebFinger server discovery (RFC 7033)
+      description: |
+        Returns a JSON Resource Descriptor confirming this server supports OBP.
+        Used by peer servers before initiating federation.
+      tags: [Federation]
+      security: []
+      parameters:
+        - name: resource
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+        - name: rel
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON Resource Descriptor
+          content:
+            application/jrd+json:
+              schema:
+                $ref: '#/components/schemas/WebFingerResponse'
+        '404':
+          description: Resource not found
+
+  /federation/peers:
+    get:
+      operationId: listPeers
+      summary: List federation peers
+      tags: [Federation]
+      security:
+        - ApiKeyAuth: [admin]
+      responses:
+        '200':
+          description: Peer list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FederationPeer'
+    post:
+      operationId: registerPeer
+      summary: Register a peer server
+      description: |
+        Initiates federation. Request must be signed with the registering
+        server's Ed25519 private key (HTTP Signature).
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeerRegistrationRequest'
+      responses:
+        '201':
+          description: Peer registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationPeer'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /federation/peers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    get:
+      operationId: getPeer
+      summary: Get peer details
+      tags: [Federation]
+      security:
+        - ApiKeyAuth: [admin]
+      responses:
+        '200':
+          description: Peer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationPeer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updatePeer
+      summary: Update peer status or trust level
+      tags: [Federation]
+      security:
+        - ApiKeyAuth: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/FederationPeerStatus'
+                trust_level:
+                  type: string
+                  enum: [open, verified, trusted]
+      responses:
+        '200':
+          description: Updated peer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationPeer'
+    delete:
+      operationId: removePeer
+      summary: Remove peer
+      tags: [Federation]
+      security:
+        - ApiKeyAuth: [admin]
+      responses:
+        '204':
+          description: Peer removed
+
+  /federation/peers/{id}/key:
+    parameters:
+      - $ref: '#/components/parameters/PathId'
+    put:
+      operationId: updatePeerKey
+      summary: Update peer public key (key rotation)
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [public_key]
+              properties:
+                public_key:
+                  type: object
+                  properties:
+                    algorithm:
+                      type: string
+                      enum: [Ed25519]
+                    value:
+                      type: string
+      responses:
+        '200':
+          description: Key updated
+
+  /federation/search:
+    get:
+      operationId: federationSearch
+      summary: Federated provider search
+      description: Returns providers matching the query. Called by peer servers.
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lng
+          in: query
+          schema:
+            type: number
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+            default: 10
+        - $ref: '#/components/parameters/QueryLimit'
+      responses:
+        '200':
+          description: Matching providers with service previews
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FederatedSearchResult'
+        '401':
+          description: Missing or invalid HTTP Signature
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /federation/slots:
+    get:
+      operationId: federationSlots
+      summary: Federated slot query
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      parameters:
+        - name: service_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Slot'
+        '401':
+          description: Missing or invalid HTTP Signature
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /federation/book:
+    post:
+      operationId: federationBook
+      summary: Create a federated booking
+      description: |
+        Creates a booking on this server on behalf of a peer's user.
+        Body is a JSON-LD BookActivity signed with the peer's private key.
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederatedBookingCreate'
+      responses:
+        '201':
+          description: Federated booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '401':
+          description: Missing or invalid HTTP Signature
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /federation/cancel:
+    post:
+      operationId: federationCancel
+      summary: Cancel a federated booking
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederatedBookingCancel'
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /federation/sync:
+    get:
+      operationId: federationSync
+      summary: Catalog sync
+      description: |
+        Returns providers and services changed since `since`. Used by peers
+        to maintain a local cache of this server's catalog.
+      tags: [Federation]
+      security:
+        - HttpSignatureAuth: []
+      parameters:
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Return only entities changed after this timestamp
+        - $ref: '#/components/parameters/QueryLimit'
+      responses:
+        '200':
+          description: Catalog diff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResponse'
+        '401':
+          description: Missing or invalid HTTP Signature
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  # ── Security schemes ────────────────────────────────────────────────────────
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: |
+        Provider API key. Include in the `X-Api-Key` header.
+        Scopes: `read` (GET), `write` (POST, PUT, PATCH, DELETE), `admin` (server admin operations).
+
+        Keys are generated via the provider dashboard or admin API.
+        Format: `obpk_<random>`.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth2 JWT access token. Used for end-user actions via the frontend.
+        Obtained via the OAuth2 authorization code flow with PKCE.
+
+    HttpSignatureAuth:
+      type: http
+      scheme: signature
+      description: |
+        RFC 9421 HTTP Message Signature using Ed25519.
+        Required for all server-to-server federation endpoints.
+
+        Headers required:
+          - `Signature-Input` — signature metadata (keyid, alg, created, nonce, covered components)
+          - `Signature` — base64-encoded Ed25519 signature
+
+        The `keyid` must be the peer server's base URL (used to look up the public key
+        from the peer's `/.well-known/obp` document).
+
+  # ── Reusable parameters ─────────────────────────────────────────────────────
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    QueryLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    QueryCursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Opaque pagination cursor from previous response
+    QueryQ:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 100
+      description: Full-text search
+    QueryCategory:
+      name: category
+      in: query
+      schema:
+        type: string
+      description: Filter by category
+
+  # ── Reusable headers ────────────────────────────────────────────────────────
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum requests allowed per window
+      schema:
+        type: integer
+      example: 100
+    X-RateLimit-Remaining:
+      description: Requests remaining in the current window
+      schema:
+        type: integer
+      example: 87
+    X-RateLimit-Reset:
+      description: Unix timestamp when the current rate-limit window resets
+      schema:
+        type: integer
+      example: 1743500000
+    Retry-After:
+      description: Seconds to wait before retrying (present on 429 responses)
+      schema:
+        type: integer
+      example: 30
+    CacheControl:
+      description: HTTP Cache-Control directive
+      schema:
+        type: string
+      example: "public, max-age=3600"
+    RateLimitHeaders:
+      description: Standard OBP rate limit headers (placeholder for $ref in responses)
+      schema:
+        type: string
+
+  # ── Reusable responses ──────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Bad request — invalid query parameters or request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: "https://obp.dev/errors/bad-request"
+            title: "Bad Request"
+            status: 400
+            detail: "date_to must be after date_from"
+    Forbidden:
+      description: Forbidden — insufficient permissions or wrong customer email
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: "https://obp.dev/errors/forbidden"
+            title: "Forbidden"
+            status: 403
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: "https://obp.dev/errors/not-found"
+            title: "Not Found"
+            status: 404
+    Conflict:
+      description: Conflict — e.g. slot already booked, invalid state transition
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: "https://obp.dev/errors/conflict"
+            title: "Conflict"
+            status: 409
+    UnprocessableEntity:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Problem'
+              - type: object
+                properties:
+                  errors:
+                    type: array
+                    description: Field-level validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: "duration_minutes"
+                        message:
+                          type: string
+                          example: "Must be a multiple of 5"
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: "https://obp.dev/errors/rate-limit-exceeded"
+            title: "Too Many Requests"
+            status: 429
+            detail: "Rate limit of 100 requests per minute exceeded."
+
+  # ── Schemas ─────────────────────────────────────────────────────────────────
+  schemas:
+    # Common
+    Problem:
+      type: object
+      description: RFC 7807 Problem Details
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://obp.dev/errors/slot-unavailable"
+        title:
+          type: string
+          example: "Slot is no longer available"
+        status:
+          type: integer
+          example: 409
+        detail:
+          type: string
+          example: "Slot slt_abc123 was booked by another customer."
+        instance:
+          type: string
+          format: uri
+          example: "/obp/v1/bookings"
+
+    Pagination:
+      type: object
+      required: [has_more]
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+          example: "eyJpZCI6MTAwfQ=="
+        has_more:
+          type: boolean
+          example: true
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+          description: Amount in smallest currency unit (e.g. 1500 = 15.00 EUR)
+          example: 1500
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          example: "RSD"
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+          example: "Knez Mihailova 10"
+        city:
+          type: string
+          example: "Beograd"
+        postal_code:
+          type: string
+          example: "11000"
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          example: "RS"
+        latitude:
+          type: number
+          example: 44.8186
+        longitude:
+          type: number
+          example: 20.4606
+
+    # Discovery
+    OBPDiscoveryDocument:
+      type: object
+      required: [version, server, capabilities, api]
+      properties:
+        version:
+          type: string
+          example: "1.0"
+        server:
+          type: object
+          required: [name, url, public_key]
+          properties:
+            name:
+              type: string
+            url:
+              type: string
+              format: uri
+            description:
+              type: string
+              nullable: true
+            admin_email:
+              type: string
+              format: email
+              nullable: true
+            public_key:
+              type: object
+              required: [algorithm, value]
+              properties:
+                algorithm:
+                  type: string
+                  enum: [Ed25519]
+                value:
+                  type: string
+        capabilities:
+          type: object
+          properties:
+            federation:
+              type: boolean
+            webhooks:
+              type: boolean
+            ical_export:
+              type: boolean
+            oauth2:
+              type: boolean
+        api:
+          type: object
+          required: [version, base_url]
+          properties:
+            version:
+              type: string
+            base_url:
+              type: string
+
+    # Provider
+    ProviderCategory:
+      type: string
+      enum:
+        - barbershop
+        - hair_salon
+        - nail_salon
+        - spa
+        - massage
+        - physiotherapy
+        - dentistry
+        - general_medicine
+        - mental_health
+        - personal_training
+        - yoga
+        - pilates
+        - martial_arts
+        - sports_facility
+        - coworking
+        - meeting_room
+        - tutoring
+        - language_learning
+        - automotive
+        - home_services
+        - legal
+        - financial
+        - photography
+        - other
+
+    Provider:
+      type: object
+      required: [id, name, slug, category, timezone, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: "prv_k3j9mxyz"
+        name:
+          type: string
+          example: "Frizerski salon Lux"
+        slug:
+          type: string
+          example: "frizerski-salon-lux"
+        description:
+          type: string
+          nullable: true
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+        website:
+          type: string
+          format: uri
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        address:
+          $ref: '#/components/schemas/Address'
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        timezone:
+          type: string
+          example: "Europe/Belgrade"
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProviderCreate:
+      type: object
+      required: [name, slug, category, timezone]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        slug:
+          type: string
+          pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+        description:
+          type: string
+          maxLength: 2000
+        logo_url:
+          type: string
+          format: uri
+        website:
+          type: string
+          format: uri
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        timezone:
+          type: string
+
+    ProviderUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+        website:
+          type: string
+          format: uri
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        timezone:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+
+    # Service
+    ServiceCategory:
+      type: string
+      enum:
+        - haircut
+        - hair_coloring
+        - hair_treatment
+        - shave
+        - beard_trim
+        - manicure
+        - pedicure
+        - gel_nails
+        - waxing
+        - eyebrow_threading
+        - makeup
+        - facial
+        - body_massage
+        - sports_massage
+        - hot_stone_massage
+        - physiotherapy_session
+        - chiropractic
+        - dental_checkup
+        - dental_cleaning
+        - dental_filling
+        - gp_consultation
+        - specialist_consultation
+        - psychotherapy
+        - coaching
+        - personal_training_session
+        - yoga_class
+        - pilates_class
+        - martial_arts_class
+        - group_fitness_class
+        - tennis_court
+        - padel_court
+        - squash_court
+        - swimming_lane
+        - basketball_court
+        - football_pitch
+        - desk_booking
+        - meeting_room
+        - private_office
+        - tutoring_session
+        - language_lesson
+        - music_lesson
+        - photography_session
+        - automotive_service
+        - home_repair
+        - legal_consultation
+        - financial_consultation
+        - other
+
+    Service:
+      type: object
+      required: [id, provider_id, name, category, duration_minutes, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: "svc_h7k2pqrs"
+        provider_id:
+          type: string
+        name:
+          type: string
+          example: "Muško šišanje"
+        description:
+          type: string
+          nullable: true
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        duration_minutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+          example: 30
+        buffer_minutes:
+          type: integer
+          minimum: 0
+          default: 0
+          example: 10
+        price:
+          $ref: '#/components/schemas/Money'
+        max_advance_days:
+          type: integer
+          default: 90
+        min_advance_hours:
+          type: integer
+          default: 0
+        resource_ids:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        sort_order:
+          type: integer
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ServiceCreate:
+      type: object
+      required: [name, category, duration_minutes]
+      properties:
+        name:
+          type: string
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        duration_minutes:
+          type: integer
+          minimum: 5
+          maximum: 480
+        buffer_minutes:
+          type: integer
+          minimum: 0
+          default: 0
+        price:
+          $ref: '#/components/schemas/Money'
+        max_advance_days:
+          type: integer
+          default: 90
+        min_advance_hours:
+          type: integer
+          default: 0
+        resource_ids:
+          type: array
+          items:
+            type: string
+          default: []
+
+    ServiceUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/ServiceCategory'
+        duration_minutes:
+          type: integer
+        buffer_minutes:
+          type: integer
+        price:
+          $ref: '#/components/schemas/Money'
+        max_advance_days:
+          type: integer
+        min_advance_hours:
+          type: integer
+        resource_ids:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [active, inactive]
+
+    # Schedule
+    Schedule:
+      type: object
+      required: [id, provider_id, timezone, rules, exceptions, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: "sch_m2n8prst"
+        provider_id:
+          type: string
+        resource_id:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+          example: "Europe/Belgrade"
+        rules:
+          type: array
+          items:
+            type: object
+            required: [day_of_week, start_time, end_time]
+            properties:
+              day_of_week:
+                type: string
+                enum: [mon, tue, wed, thu, fri, sat, sun]
+              start_time:
+                type: string
+                pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+              end_time:
+                type: string
+                pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+        exceptions:
+          type: array
+          items:
+            type: object
+            required: [date, type]
+            properties:
+              date:
+                type: string
+                format: date
+              type:
+                type: string
+                enum: [closed, custom_hours]
+              start_time:
+                type: string
+              end_time:
+                type: string
+              note:
+                type: string
+                nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ScheduleUpsert:
+      type: object
+      required: [timezone, rules]
+      properties:
+        resource_id:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+        rules:
+          type: array
+          items:
+            type: object
+            required: [day_of_week, start_time, end_time]
+            properties:
+              day_of_week:
+                type: string
+                enum: [mon, tue, wed, thu, fri, sat, sun]
+              start_time:
+                type: string
+              end_time:
+                type: string
+        exceptions:
+          type: array
+          items:
+            type: object
+            required: [date, type]
+            properties:
+              date:
+                type: string
+                format: date
+              type:
+                type: string
+                enum: [closed, custom_hours]
+              start_time:
+                type: string
+              end_time:
+                type: string
+              note:
+                type: string
+          default: []
+
+    # Slot
+    Slot:
+      type: object
+      required: [id, provider_id, service_id, start_at, end_at, status]
+      properties:
+        id:
+          type: string
+          example: "slt_9xkr2mwp"
+        provider_id:
+          type: string
+        service_id:
+          type: string
+        resource_ids:
+          type: array
+          items:
+            type: string
+        start_at:
+          type: string
+          format: date-time
+          example: "2026-04-01T08:00:00Z"
+        end_at:
+          type: string
+          format: date-time
+          example: "2026-04-01T08:30:00Z"
+        status:
+          type: string
+          enum: [available, held, booked]
+        hold_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SlotHoldRequest:
+      type: object
+      properties:
+        ttl_seconds:
+          type: integer
+          minimum: 60
+          maximum: 1800
+          default: 600
+
+    SlotHoldResponse:
+      type: object
+      required: [slot_id, expires_at]
+      properties:
+        slot_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    # Booking
+    BookingStatus:
+      type: string
+      enum: [pending, confirmed, completed, cancelled, no_show]
+
+    Booking:
+      type: object
+      required: [id, provider_id, service_id, slot_id, customer, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: "bkg_q5r8stuv"
+        provider_id:
+          type: string
+        service_id:
+          type: string
+        slot_id:
+          type: string
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        customer:
+          type: object
+          required: [name, email]
+          properties:
+            name:
+              type: string
+              example: "Marko Marković"
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+              nullable: true
+            notes:
+              type: string
+              nullable: true
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        cancellation_reason:
+          type: string
+          nullable: true
+        cancelled_by:
+          type: string
+          enum: [customer, provider, system]
+          nullable: true
+        federated_from:
+          type: string
+          format: uri
+          nullable: true
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    BookingCreate:
+      type: object
+      required: [slot_id, customer]
+      properties:
+        slot_id:
+          type: string
+        customer:
+          type: object
+          required: [name, email]
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+              nullable: true
+            notes:
+              type: string
+              nullable: true
+
+    BookingCancel:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    # Webhook
+    WebhookEventType:
+      type: string
+      enum:
+        - booking.created
+        - booking.confirmed
+        - booking.cancelled
+        - booking.completed
+        - booking.no_show
+        - slot.held
+        - slot.released
+
+    Webhook:
+      type: object
+      required: [id, provider_id, url, events, active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: "whk_r2s5tuvw"
+        provider_id:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEventType'
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    WebhookCreate:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEventType'
+          minItems: 1
+
+    WebhookResponse:
+      allOf:
+        - $ref: '#/components/schemas/Webhook'
+        - type: object
+          properties:
+            secret:
+              type: string
+              description: Signing secret — only present in creation response
+              example: "whsec_abc123..."
+
+    # Federation
+    WebFingerResponse:
+      type: object
+      required: [subject, links]
+      properties:
+        subject:
+          type: string
+          example: "https://obp.example.com"
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              rel:
+                type: string
+              href:
+                type: string
+                format: uri
+              type:
+                type: string
+
+    FederationPeerStatus:
+      type: string
+      enum: [pending, active, suspended, blocked]
+
+    FederationPeer:
+      type: object
+      required: [id, server_url, name, public_key, status, created_at]
+      properties:
+        id:
+          type: string
+          example: "peer_berlin1"
+        server_url:
+          type: string
+          format: uri
+        name:
+          type: string
+        admin_email:
+          type: string
+          format: email
+          nullable: true
+        public_key:
+          type: object
+          properties:
+            algorithm:
+              type: string
+              enum: [Ed25519]
+            value:
+              type: string
+        status:
+          $ref: '#/components/schemas/FederationPeerStatus'
+        trust_level:
+          type: string
+          enum: [open, verified, trusted]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PeerRegistrationRequest:
+      type: object
+      required: [server_url, name, public_key, nonce]
+      properties:
+        server_url:
+          type: string
+          format: uri
+        name:
+          type: string
+        admin_email:
+          type: string
+          format: email
+          nullable: true
+        public_key:
+          type: object
+          required: [algorithm, value]
+          properties:
+            algorithm:
+              type: string
+              enum: [Ed25519]
+            value:
+              type: string
+        nonce:
+          type: string
+          description: 32-byte hex nonce, prevents replay attacks
+
+    FederatedSearchResult:
+      type: object
+      required: [provider, server_url]
+      properties:
+        provider:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+              nullable: true
+            category:
+              type: string
+            timezone:
+              type: string
+            address:
+              type: object
+              properties:
+                city:
+                  type: string
+                country:
+                  type: string
+                latitude:
+                  type: number
+                  nullable: true
+                longitude:
+                  type: number
+                  nullable: true
+        services_preview:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              duration_minutes:
+                type: integer
+              price:
+                nullable: true
+                type: object
+                properties:
+                  amount:
+                    type: integer
+                  currency:
+                    type: string
+        server_url:
+          type: string
+          format: uri
+
+    FederatedBookingCreate:
+      type: object
+      required: ["@context", "@type", "actor", "object"]
+      properties:
+        "@context":
+          type: string
+          enum: ["https://obp.dev/context/v1"]
+        "@type":
+          type: string
+          enum: [BookActivity]
+        actor:
+          type: string
+          format: uri
+        object:
+          type: object
+          required: [slot_id, service_id, customer, originating_booking_id]
+          properties:
+            slot_id:
+              type: string
+            service_id:
+              type: string
+            customer:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                  nullable: true
+            originating_booking_id:
+              type: string
+            originating_server:
+              type: string
+              format: uri
+
+    FederatedBookingCancel:
+      type: object
+      required: ["@context", "@type", "actor", "object"]
+      properties:
+        "@context":
+          type: string
+          enum: ["https://obp.dev/context/v1"]
+        "@type":
+          type: string
+          enum: [CancelActivity]
+        actor:
+          type: string
+          format: uri
+        object:
+          type: object
+          required: [booking_id, originating_booking_id]
+          properties:
+            booking_id:
+              type: string
+            originating_booking_id:
+              type: string
+            reason:
+              type: string
+              nullable: true
+
+    SyncResponse:
+      type: object
+      required: [server_url, since, until, providers, services]
+      properties:
+        server_url:
+          type: string
+          format: uri
+        since:
+          type: string
+          format: date-time
+          nullable: true
+        until:
+          type: string
+          format: date-time
+        providers:
+          type: object
+          properties:
+            upserted:
+              type: array
+              items:
+                type: object
+            deleted:
+              type: array
+              items:
+                type: string
+        services:
+          type: object
+          properties:
+            upserted:
+              type: array
+              items:
+                type: object
+            deleted:
+              type: array
+              items:
+                type: string

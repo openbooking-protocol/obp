@@ -1,0 +1,439 @@
+# Federation schemas — OpenBooking Protocol
+# Tasks: 1.4.1–1.4.10
+
+# ── WebFinger (1.4.1) ─────────────────────────────────────────────────────────
+# RFC 7033 — used for OBP server discovery via host metadata
+
+WebFingerLink:
+  type: object
+  required: [rel, href]
+  properties:
+    rel:
+      type: string
+      description: Relation type URI
+      example: "https://obp.dev/ns/server"
+    href:
+      type: string
+      format: uri
+      example: "https://obp.example.com/.well-known/obp"
+    type:
+      type: string
+      example: "application/json"
+
+WebFingerResponse:
+  type: object
+  description: |
+    RFC 7033 JSON Resource Descriptor (JRD).
+
+    Discovery flow:
+      GET https://server.example.com/.well-known/webfinger
+            ?resource=https://server.example.com
+            &rel=https://obp.dev/ns/server
+
+    Returns a JRD with a link pointing to /.well-known/obp.
+    Clients use this to verify the server supports OBP before fetching
+    the full discovery document.
+  required: [subject, links]
+  properties:
+    subject:
+      type: string
+      example: "https://obp.example.com"
+    links:
+      type: array
+      items:
+        $ref: '#/WebFingerLink'
+      example:
+        - rel: "https://obp.dev/ns/server"
+          href: "https://obp.example.com/.well-known/obp"
+          type: "application/json"
+
+# ── Server registration (1.4.2) ───────────────────────────────────────────────
+# Flow:
+#  1. Server A wants to federate with Server B
+#  2. A fetches B's /.well-known/obp → gets B's public key + endpoints
+#  3. A sends POST /obp/v1/federation/peers to B with A's info + signed nonce
+#  4. B verifies signature, optionally auto-approves or queues for admin
+#  5. B sends POST /obp/v1/federation/peers to A (reciprocal registration)
+#  6. Both servers store each other's public keys → mutual trust established
+
+FederationPeerStatus:
+  type: string
+  enum: [pending, active, suspended, blocked]
+  description: |
+    - `pending` — registration received, awaiting admin approval (if not auto-approve)
+    - `active` — trusted peer; federation requests are accepted
+    - `suspended` — temporarily disabled by local admin
+    - `blocked` — blocked; all requests from this peer are rejected with 403
+
+FederationPeer:
+  type: object
+  description: A registered peer OBP server
+  required: [id, server_url, name, public_key, status, created_at]
+  properties:
+    id:
+      type: string
+      description: Local peer identifier (prefix `peer_`)
+      example: "peer_berlin1"
+    server_url:
+      type: string
+      format: uri
+      description: Base URL of the peer server
+      example: "https://obp-berlin.example.com"
+    name:
+      type: string
+      description: Human-readable name of the peer server
+      example: "OBP Berlin Node"
+    admin_email:
+      type: string
+      format: email
+      nullable: true
+    public_key:
+      type: object
+      required: [algorithm, value]
+      properties:
+        algorithm:
+          type: string
+          enum: [Ed25519]
+        value:
+          type: string
+          description: Base64-encoded DER public key
+          example: "MCowBQYDK2VdAyEA..."
+    status:
+      $ref: '#/FederationPeerStatus'
+    trust_level:
+      type: string
+      enum: [open, verified, trusted]
+      description: |
+        - `open` — accepted automatically; limited rate limit
+        - `verified` — admin-verified identity; standard rate limit
+        - `trusted` — explicitly trusted; higher rate limit, can trigger sync
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+PeerRegistrationRequest:
+  type: object
+  description: |
+    Sent by Server A to Server B to initiate peering.
+    The request body must be signed with A's private key (HTTP Signature).
+    B verifies the signature against the public key provided in the request,
+    then fetches A's /.well-known/obp to cross-check the public key.
+  required: [server_url, name, public_key, nonce]
+  properties:
+    server_url:
+      type: string
+      format: uri
+      example: "https://obp-berlin.example.com"
+    name:
+      type: string
+      example: "OBP Berlin Node"
+    admin_email:
+      type: string
+      format: email
+      nullable: true
+    public_key:
+      type: object
+      required: [algorithm, value]
+      properties:
+        algorithm:
+          type: string
+          enum: [Ed25519]
+        value:
+          type: string
+    nonce:
+      type: string
+      description: Random 32-byte hex string, signed as part of the request. Prevents replay attacks.
+      example: "a3f8b2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1"
+
+# ── HTTP Signatures (1.4.3) ───────────────────────────────────────────────────
+# RFC 9421 — HTTP Message Signatures
+#
+# Signing algorithm: Ed25519
+# Key format: Per-server Ed25519 key pair. Public key in /.well-known/obp
+#
+# Signed components (required):
+#   "@method"       — HTTP method (GET, POST, etc.)
+#   "@authority"    — Host header value
+#   "@request-target" — Path + query string
+#   "content-digest" — SHA-256 digest of request body (for POST/PUT)
+#   "date"          — RFC 7231 date (must be within ±5 minutes of receiver's clock)
+#
+# Signature-Input header format:
+#   Signature-Input: sig1=("@method" "@authority" "@request-target" "date");
+#                    keyid="https://obp-berlin.example.com";
+#                    alg="ed25519";
+#                    created=1743500000;
+#                    nonce="a3f8b2c1..."
+#
+# Signature header format:
+#   Signature: sig1=:base64encodedSignatureBytes:
+#
+# Replay protection:
+#   - `created` timestamp must be within ±5 minutes of receiver's clock
+#   - `nonce` is stored by receiver for 10 minutes; duplicate nonces are rejected
+#
+# Key rotation:
+#   - Server generates a new key pair
+#   - Updates /.well-known/obp with new public key
+#   - Notifies peers via PUT /obp/v1/federation/peers/{id}/key
+#   - Old key accepted for 1 hour after rotation (grace period)
+
+HttpSignatureInfo:
+  type: object
+  description: Metadata about an HTTP Signature on a federation request
+  properties:
+    keyid:
+      type: string
+      format: uri
+      description: Server URL of the signing server (used to look up the public key)
+      example: "https://obp-berlin.example.com"
+    algorithm:
+      type: string
+      enum: [ed25519]
+    created:
+      type: integer
+      description: Unix timestamp when the signature was created
+    nonce:
+      type: string
+
+# ── JSON-LD message format (1.4.4) ────────────────────────────────────────────
+# All federation messages use JSON-LD for semantic interoperability.
+# Context: https://obp.dev/context/v1
+#
+# Example federated booking activity:
+# {
+#   "@context": "https://obp.dev/context/v1",
+#   "@type": "BookingActivity",
+#   "actor": "https://obp-berlin.example.com",
+#   "object": {
+#     "@type": "Booking",
+#     "service": "https://obp.example.com/obp/v1/services/svc_h7k2pqrs",
+#     "slot": "https://obp.example.com/obp/v1/slots/slt_9xkr2mwp",
+#     "customer": {
+#       "name": "Max Müller",
+#       "email": "max@example.de"
+#     },
+#     "originatingBookingId": "bkg_remote_abc123"
+#   }
+# }
+
+JsonLdActivity:
+  type: object
+  description: |
+    Base JSON-LD activity wrapper for all federation messages.
+    All federation request bodies must include `@context` and `@type`.
+  required: ["@context", "@type", "actor"]
+  properties:
+    "@context":
+      type: string
+      enum: ["https://obp.dev/context/v1"]
+    "@type":
+      type: string
+      enum:
+        - SearchActivity
+        - SlotQueryActivity
+        - BookActivity
+        - CancelActivity
+        - SyncActivity
+    actor:
+      type: string
+      format: uri
+      description: Server URL of the originating server
+      example: "https://obp-berlin.example.com"
+
+# ── Federation search (1.4.5) ─────────────────────────────────────────────────
+FederatedSearchResult:
+  type: object
+  description: A provider from a remote server returned via federated search
+  required: [provider, server_url]
+  properties:
+    provider:
+      type: object
+      description: Partial provider data (public fields only)
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+        timezone:
+          type: string
+        address:
+          type: object
+          properties:
+            city:
+              type: string
+            country:
+              type: string
+            latitude:
+              type: number
+              nullable: true
+            longitude:
+              type: number
+              nullable: true
+    services_preview:
+      type: array
+      maxItems: 3
+      description: First 3 services (for preview cards)
+      items:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          duration_minutes:
+            type: integer
+          price:
+            type: object
+            nullable: true
+            properties:
+              amount:
+                type: integer
+              currency:
+                type: string
+    server_url:
+      type: string
+      format: uri
+      description: Base URL of the server hosting this provider
+      example: "https://obp-berlin.example.com"
+
+# ── Federation book (1.4.7) ───────────────────────────────────────────────────
+FederatedBookingCreate:
+  type: object
+  description: |
+    Request body for creating a federated booking.
+    Must be a JSON-LD activity signed with the originating server's private key.
+  required: ["@context", "@type", "actor", "object"]
+  allOf:
+    - $ref: '#/JsonLdActivity'
+    - type: object
+      properties:
+        object:
+          type: object
+          required: [slot_id, service_id, customer, originating_booking_id]
+          properties:
+            slot_id:
+              type: string
+              description: Slot ID on the target server
+            service_id:
+              type: string
+              description: Service ID on the target server
+            customer:
+              type: object
+              required: [name, email]
+              description: |
+                Minimal customer data. Target server must not store more than
+                is necessary for the booking (data minimization).
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                  nullable: true
+            originating_booking_id:
+              type: string
+              description: Booking ID on the originating server (for reconciliation)
+              example: "bkg_remote_abc123"
+            originating_server:
+              type: string
+              format: uri
+              example: "https://obp-berlin.example.com"
+
+FederatedBookingCancel:
+  type: object
+  required: ["@context", "@type", "actor", "object"]
+  allOf:
+    - $ref: '#/JsonLdActivity'
+    - type: object
+      properties:
+        object:
+          type: object
+          required: [booking_id, originating_booking_id]
+          properties:
+            booking_id:
+              type: string
+              description: Booking ID on the target server
+            originating_booking_id:
+              type: string
+            reason:
+              type: string
+              nullable: true
+
+# ── Catalog sync (1.4.9) ──────────────────────────────────────────────────────
+SyncResponse:
+  type: object
+  description: |
+    Response to a catalog sync request. Contains only changed entities
+    since the `since` timestamp (diff-based sync).
+    Receivers cache this data in Redis for fast federated search.
+  required: [server_url, since, until, providers, services]
+  properties:
+    server_url:
+      type: string
+      format: uri
+    since:
+      type: string
+      format: date-time
+      description: Start of the sync window (from request)
+    until:
+      type: string
+      format: date-time
+      description: End of the sync window (server's current time)
+    providers:
+      type: object
+      properties:
+        upserted:
+          type: array
+          items:
+            type: object
+          description: New or updated providers since `since`
+        deleted:
+          type: array
+          items:
+            type: string
+          description: IDs of providers deleted since `since`
+    services:
+      type: object
+      properties:
+        upserted:
+          type: array
+          items:
+            type: object
+        deleted:
+          type: array
+          items:
+            type: string
+
+# ── Trust & security model (1.4.10) ──────────────────────────────────────────
+#
+# Trust levels and their capabilities:
+#
+# | Level      | Auto-approve | Rate limit | Can trigger sync | Cross-server bookings |
+# |------------|-------------|------------|------------------|-----------------------|
+# | open       | Yes         | 60/min     | No               | Yes (with hold)       |
+# | verified   | No (admin)  | 300/min    | Yes (pull)       | Yes                  |
+# | trusted    | No (admin)  | 1000/min   | Yes (push+pull)  | Yes                  |
+# | blocked    | —           | 0          | No               | No (403)             |
+#
+# Security rules:
+# 1. All federation requests MUST be signed (HTTP Signature required)
+# 2. Unsigned requests are rejected with 401
+# 3. Requests from non-registered peers are rejected with 403
+# 4. Requests from blocked peers are rejected with 403
+# 5. Nonce replay within 10-minute window is rejected with 409
+# 6. Clock skew > 5 minutes is rejected with 400
+# 7. Customer email is never shared with peer servers in sync responses
+# 8. Booking customer data is transmitted only for the specific booking (minimization)
+# 9. Servers MUST implement TLS 1.2+ for all federation endpoints
+# 10. Peer public keys are fetched from /.well-known/obp and cached for 1 hour

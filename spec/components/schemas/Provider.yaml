@@ -1,0 +1,207 @@
+# Provider schema — OpenBooking Protocol
+# Tasks: 1.1.1 (schema), 1.1.2 (validation)
+
+ProviderStatus:
+  type: string
+  enum: [active, inactive, suspended]
+  description: |
+    - `active` — accepting bookings
+    - `inactive` — temporarily not accepting bookings
+    - `suspended` — suspended by server admin
+
+ProviderCategory:
+  type: string
+  description: Top-level category for discovery and filtering
+  enum:
+    - barbershop
+    - hair_salon
+    - nail_salon
+    - spa
+    - massage
+    - physiotherapy
+    - dentistry
+    - general_medicine
+    - mental_health
+    - personal_training
+    - yoga
+    - pilates
+    - martial_arts
+    - sports_facility
+    - coworking
+    - meeting_room
+    - tutoring
+    - language_learning
+    - automotive
+    - home_services
+    - legal
+    - financial
+    - photography
+    - other
+
+Provider:
+  type: object
+  description: |
+    A Provider is a business or individual that offers bookable services.
+    Each Provider is registered on an OBP server and can optionally participate in federation.
+  required:
+    - id
+    - name
+    - slug
+    - category
+    - timezone
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique provider identifier (prefix `prv_`)
+      example: "prv_k3j9mxyz"
+      readOnly: true
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      description: Display name of the provider
+      example: "Frizerski salon Lux"
+    slug:
+      type: string
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      minLength: 2
+      maxLength: 60
+      description: URL-friendly unique identifier within this server
+      example: "frizerski-salon-lux"
+    description:
+      type: string
+      maxLength: 2000
+      nullable: true
+      example: "Premium frizerski salon u centru Beograda."
+    logo_url:
+      type: string
+      format: uri
+      nullable: true
+      example: "https://cdn.example.com/logos/salon-lux.png"
+    website:
+      type: string
+      format: uri
+      nullable: true
+      example: "https://salon-lux.rs"
+    email:
+      type: string
+      format: email
+      nullable: true
+      example: "info@salon-lux.rs"
+    phone:
+      type: string
+      pattern: '^\+?[0-9\s\-().]{7,20}$'
+      nullable: true
+      example: "+381601234567"
+    address:
+      $ref: 'Common.yaml#/Address'
+      nullable: true
+    category:
+      $ref: '#/ProviderCategory'
+    timezone:
+      $ref: 'Common.yaml#/IANATimezone'
+    server_url:
+      type: string
+      format: uri
+      description: |
+        Base URL of the OBP server hosting this provider.
+        Set automatically; used for federation to route cross-server requests.
+      example: "https://obp.example.com"
+      readOnly: true
+    status:
+      $ref: '#/ProviderStatus'
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+
+ProviderCreate:
+  type: object
+  description: Request body for creating a new provider
+  required:
+    - name
+    - slug
+    - category
+    - timezone
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      example: "Frizerski salon Lux"
+    slug:
+      type: string
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      minLength: 2
+      maxLength: 60
+      example: "frizerski-salon-lux"
+    description:
+      type: string
+      maxLength: 2000
+      example: "Premium frizerski salon u centru Beograda."
+    logo_url:
+      type: string
+      format: uri
+      example: "https://cdn.example.com/logos/salon-lux.png"
+    website:
+      type: string
+      format: uri
+      example: "https://salon-lux.rs"
+    email:
+      type: string
+      format: email
+      example: "info@salon-lux.rs"
+    phone:
+      type: string
+      pattern: '^\+?[0-9\s\-().]{7,20}$'
+      example: "+381601234567"
+    address:
+      $ref: 'Common.yaml#/Address'
+    category:
+      $ref: '#/ProviderCategory'
+    timezone:
+      $ref: 'Common.yaml#/IANATimezone'
+
+ProviderUpdate:
+  type: object
+  description: Request body for updating a provider (all fields optional)
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    description:
+      type: string
+      maxLength: 2000
+    logo_url:
+      type: string
+      format: uri
+    website:
+      type: string
+      format: uri
+    email:
+      type: string
+      format: email
+    phone:
+      type: string
+      pattern: '^\+?[0-9\s\-().]{7,20}$'
+    address:
+      $ref: 'Common.yaml#/Address'
+    category:
+      $ref: '#/ProviderCategory'
+    timezone:
+      $ref: 'Common.yaml#/IANATimezone'
+    status:
+      $ref: '#/ProviderStatus'
+
+# Validation rules (enforced at API layer):
+# - slug must be unique per server
+# - timezone must be a valid IANA identifier
+# - email must be unique per server (used for auth)
+# - status transitions: active ↔ inactive (by provider); suspended (admin only)
+# - logo_url and website must use HTTPS in production

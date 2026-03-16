@@ -1,0 +1,10 @@
+{
+  "id": "slt_9xkr2mwp",
+  "provider_id": "prv_k3j9mxyz",
+  "service_id": "svc_h7k2pqrs",
+  "resource_ids": ["res_ana_p", "res_chair_1"],
+  "start_at": "2026-04-01T08:00:00Z",
+  "end_at": "2026-04-01T08:30:00Z",
+  "status": "available",
+  "hold_expires_at": null
+}

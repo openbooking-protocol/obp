@@ -1,0 +1,29 @@
+{
+  "id": "sch_m2n8prst",
+  "provider_id": "prv_k3j9mxyz",
+  "resource_id": "res_ana_p",
+  "timezone": "Europe/Belgrade",
+  "rules": [
+    { "day_of_week": "mon", "start_time": "09:00", "end_time": "18:00" },
+    { "day_of_week": "tue", "start_time": "09:00", "end_time": "18:00" },
+    { "day_of_week": "wed", "start_time": "09:00", "end_time": "18:00" },
+    { "day_of_week": "thu", "start_time": "09:00", "end_time": "18:00" },
+    { "day_of_week": "fri", "start_time": "09:00", "end_time": "17:00" }
+  ],
+  "exceptions": [
+    {
+      "date": "2026-04-18",
+      "type": "closed",
+      "note": "Uskrs"
+    },
+    {
+      "date": "2026-12-31",
+      "type": "custom_hours",
+      "start_time": "09:00",
+      "end_time": "13:00",
+      "note": "Nova godina — skraćeno radno vreme"
+    }
+  ],
+  "created_at": "2026-03-01T10:03:00Z",
+  "updated_at": "2026-03-10T09:00:00Z"
+}

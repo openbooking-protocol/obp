@@ -1,0 +1,83 @@
+# Discovery document schema
+
+OBPDiscoveryDocument:
+  type: object
+  required: [version, server, capabilities, api]
+  properties:
+    version:
+      type: string
+      description: OBP protocol version implemented by this server
+      example: "1.0"
+    server:
+      type: object
+      required: [name, url, public_key]
+      properties:
+        name:
+          type: string
+          example: "My OBP Server"
+        url:
+          type: string
+          format: uri
+          example: "https://obp.example.com"
+        description:
+          type: string
+          nullable: true
+          example: "OBP reference server for demonstrations"
+        admin_email:
+          type: string
+          format: email
+          nullable: true
+          example: "admin@example.com"
+        public_key:
+          type: object
+          required: [algorithm, value]
+          properties:
+            algorithm:
+              type: string
+              enum: [Ed25519]
+            value:
+              type: string
+              description: Base64-encoded DER public key
+              example: "MCowBQYDK2VdAyEA..."
+    capabilities:
+      type: object
+      properties:
+        federation:
+          type: boolean
+          example: true
+        webhooks:
+          type: boolean
+          example: true
+        ical_export:
+          type: boolean
+          example: true
+        oauth2:
+          type: boolean
+          example: true
+    federation:
+      type: object
+      nullable: true
+      properties:
+        enabled:
+          type: boolean
+        endpoints:
+          type: object
+          properties:
+            search:
+              type: string
+            slots:
+              type: string
+            book:
+              type: string
+            cancel:
+              type: string
+    api:
+      type: object
+      required: [version, base_url]
+      properties:
+        version:
+          type: string
+          example: "1"
+        base_url:
+          type: string
+          example: "/obp/v1"

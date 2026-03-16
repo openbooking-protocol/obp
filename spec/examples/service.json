@@ -1,0 +1,21 @@
+{
+  "id": "svc_h7k2pqrs",
+  "provider_id": "prv_k3j9mxyz",
+  "name": "Muško šišanje",
+  "description": "Klasično muško šišanje sa pranjem kose i stilizacijom. Uključuje konsultaciju o stilu.",
+  "category": "haircut",
+  "duration_minutes": 30,
+  "buffer_minutes": 10,
+  "price": {
+    "amount": 1500,
+    "currency": "RSD"
+  },
+  "max_advance_days": 60,
+  "min_advance_hours": 2,
+  "max_per_day": null,
+  "resource_ids": ["res_ana_p", "res_chair_1"],
+  "status": "active",
+  "sort_order": 1,
+  "created_at": "2026-03-01T10:05:00Z",
+  "updated_at": "2026-03-01T10:05:00Z"
+}

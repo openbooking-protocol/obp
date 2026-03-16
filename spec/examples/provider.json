@@ -1,0 +1,25 @@
+{
+  "id": "prv_k3j9mxyz",
+  "name": "Frizerski salon Lux",
+  "slug": "frizerski-salon-lux",
+  "description": "Premium frizerski salon u centru Beograda. Specijalizovani za muška i ženska šišanja, bojenje i tretmane kose.",
+  "logo_url": "https://cdn.example.com/logos/salon-lux.png",
+  "website": "https://salon-lux.rs",
+  "email": "info@salon-lux.rs",
+  "phone": "+381601234567",
+  "address": {
+    "street": "Knez Mihailova 10",
+    "city": "Beograd",
+    "state": null,
+    "postal_code": "11000",
+    "country": "RS",
+    "latitude": 44.8186,
+    "longitude": 20.4606
+  },
+  "category": "hair_salon",
+  "timezone": "Europe/Belgrade",
+  "server_url": "https://obp.example.com",
+  "status": "active",
+  "created_at": "2026-03-01T10:00:00Z",
+  "updated_at": "2026-03-15T14:30:00Z"
+}

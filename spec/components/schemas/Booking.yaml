@@ -1,0 +1,195 @@
+# Booking schema — OpenBooking Protocol
+# Tasks: 1.1.14 (schema), 1.1.15 (lifecycle), 1.1.16 (validation)
+
+BookingStatus:
+  type: string
+  enum: [pending, confirmed, completed, cancelled, no_show]
+  description: |
+    Booking lifecycle states:
+
+    ```
+    [created] ──▶ pending ──▶ confirmed ──▶ completed
+                     │              │
+                     ▼              ▼
+                 cancelled      cancelled
+                                    │
+                                    ▼
+                                 no_show
+    ```
+
+    - `pending` — booking created, awaiting provider confirmation
+    - `confirmed` — provider confirmed the booking; appointment is set
+    - `completed` — appointment took place successfully
+    - `cancelled` — cancelled by customer or provider before the appointment
+    - `no_show` — customer did not appear (recorded by provider after appointment time)
+
+    **Valid transitions:**
+    | From | To | Who |
+    |------|----|-----|
+    | pending | confirmed | provider |
+    | pending | cancelled | customer or provider |
+    | confirmed | completed | provider |
+    | confirmed | cancelled | customer or provider (subject to cancellation policy) |
+    | confirmed | no_show | provider (only after slot start_at has passed) |
+
+    Invalid transitions are rejected with HTTP 422.
+
+BookingCustomer:
+  type: object
+  description: Customer contact information embedded in the booking
+  required:
+    - name
+    - email
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      example: "Marko Marković"
+    email:
+      type: string
+      format: email
+      example: "marko@example.com"
+    phone:
+      type: string
+      pattern: '^\+?[0-9\s\-().]{7,20}$'
+      nullable: true
+      example: "+381601234567"
+    notes:
+      type: string
+      maxLength: 500
+      nullable: true
+      description: Customer notes or special requests
+      example: "Alergičan na određene hemikalije, molim proveriti pre tretmana."
+
+CancellationActor:
+  type: string
+  enum: [customer, provider, system]
+
+Booking:
+  type: object
+  description: |
+    A Booking is a confirmed (or pending) reservation of a Slot by a Customer.
+
+    Once created, a Booking:
+    - Claims the Slot (status → booked)
+    - Releases the hold in Redis (if one existed)
+    - Triggers a `booking.created` webhook event
+    - Sends a confirmation email to the customer (if email configured)
+
+    The Booking references the Slot at creation time. If the Slot is later
+    regenerated (e.g., schedule change), existing Bookings are not affected.
+  required:
+    - id
+    - provider_id
+    - service_id
+    - slot_id
+    - customer
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique booking identifier (prefix `bkg_`)
+      example: "bkg_q5r8stuv"
+      readOnly: true
+    provider_id:
+      type: string
+      example: "prv_k3j9mxyz"
+    service_id:
+      type: string
+      example: "svc_h7k2pqrs"
+    slot_id:
+      type: string
+      example: "slt_9xkr2mwp"
+    start_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      description: Denormalized from slot for query efficiency
+      example: "2026-04-01T08:00:00Z"
+    end_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      description: Denormalized from slot for query efficiency
+      example: "2026-04-01T08:30:00Z"
+    customer:
+      $ref: '#/BookingCustomer'
+    status:
+      $ref: '#/BookingStatus'
+    cancellation_reason:
+      type: string
+      maxLength: 500
+      nullable: true
+      description: Reason for cancellation (provided by the cancelling party)
+      example: "Customer requested cancellation 24h in advance."
+    cancelled_by:
+      $ref: '#/CancellationActor'
+      nullable: true
+    federated_from:
+      type: string
+      format: uri
+      nullable: true
+      description: |
+        Base URL of the originating server if this is a federated booking.
+        Null for local bookings.
+      example: "https://obp-berlin.example.com"
+    federated_booking_id:
+      type: string
+      nullable: true
+      description: Booking ID on the originating server (for cross-server reconciliation)
+      example: "bkg_remote_xyz"
+    version:
+      type: integer
+      minimum: 1
+      description: Optimistic locking version counter, incremented on every state change
+      example: 1
+      readOnly: true
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    confirmed_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      nullable: true
+      readOnly: true
+    cancelled_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      nullable: true
+      readOnly: true
+    completed_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      nullable: true
+      readOnly: true
+
+BookingCreate:
+  type: object
+  description: Request body for POST /bookings
+  required:
+    - slot_id
+    - customer
+  properties:
+    slot_id:
+      type: string
+      example: "slt_9xkr2mwp"
+    customer:
+      $ref: '#/BookingCustomer'
+
+BookingCancel:
+  type: object
+  description: Request body for POST /bookings/{id}/cancel
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+      example: "Ne mogu doći u dogovoreno vreme."
+
+# Validation rules:
+# - slot_id must reference an available or held slot
+# - If slot is held, the hold must belong to the current session (or be expired)
+# - customer.email must be a valid RFC 5322 address
+# - Booking creation uses SELECT ... FOR UPDATE on resource availability to prevent races
+# - Double booking prevention: creation fails with 409 if any required resource is
+#   already booked in an overlapping time range
+# - no_show can only be set after the slot's start_at has passed
+# - Cancellation after confirmed: subject to provider's cancellation policy (future v1.1)

@@ -1,0 +1,273 @@
+# Service schema — OpenBooking Protocol
+# Tasks: 1.1.4 (schema), 1.1.5 (kategorije), 1.1.2 (validation)
+
+ServiceCategory:
+  type: string
+  description: |
+    Service category used for discovery and filtering. Inherits from the parent
+    Provider's category but can be more specific.
+  enum:
+    # Hair & Beauty
+    - haircut
+    - hair_coloring
+    - hair_treatment
+    - shave
+    - beard_trim
+    - manicure
+    - pedicure
+    - gel_nails
+    - waxing
+    - eyebrow_threading
+    - makeup
+    - facial
+    - body_massage
+    - sports_massage
+    - hot_stone_massage
+    # Health
+    - physiotherapy_session
+    - chiropractic
+    - dental_checkup
+    - dental_cleaning
+    - dental_filling
+    - gp_consultation
+    - specialist_consultation
+    - psychotherapy
+    - coaching
+    # Fitness & Sports
+    - personal_training_session
+    - yoga_class
+    - pilates_class
+    - martial_arts_class
+    - group_fitness_class
+    - tennis_court
+    - padel_court
+    - squash_court
+    - swimming_lane
+    - basketball_court
+    - football_pitch
+    # Workspace
+    - desk_booking
+    - meeting_room
+    - private_office
+    # Education
+    - tutoring_session
+    - language_lesson
+    - music_lesson
+    # Other
+    - photography_session
+    - automotive_service
+    - home_repair
+    - legal_consultation
+    - financial_consultation
+    - other
+
+ServiceStatus:
+  type: string
+  enum: [active, inactive]
+  description: |
+    - `active` — visible and bookable by customers
+    - `inactive` — hidden from public discovery
+
+Service:
+  type: object
+  description: |
+    A Service is a specific bookable offering by a Provider. It defines what
+    is offered, how long it takes, its price, and which Resources are required.
+  required:
+    - id
+    - provider_id
+    - name
+    - category
+    - duration_minutes
+    - status
+    - created_at
+    - updated_at
+  properties:
+    id:
+      type: string
+      description: Unique service identifier (prefix `svc_`)
+      example: "svc_h7k2pqrs"
+      readOnly: true
+    provider_id:
+      type: string
+      description: ID of the parent provider
+      example: "prv_k3j9mxyz"
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      example: "Muško šišanje"
+    description:
+      type: string
+      maxLength: 1000
+      nullable: true
+      example: "Klasično muško šišanje sa pranjem i stilizacijom."
+    category:
+      $ref: '#/ServiceCategory'
+    duration_minutes:
+      type: integer
+      minimum: 5
+      maximum: 480
+      description: Duration of the service in minutes
+      example: 30
+    buffer_minutes:
+      type: integer
+      minimum: 0
+      maximum: 120
+      default: 0
+      description: |
+        Gap after the service before the next slot can start.
+        Used for cleanup, travel, or recovery time.
+      example: 10
+    price:
+      $ref: 'Common.yaml#/Money'
+      nullable: true
+      description: Price of the service. Null means price is not disclosed (contact provider).
+    max_advance_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+      default: 90
+      description: How many days in advance a customer can book
+      example: 60
+    min_advance_hours:
+      type: integer
+      minimum: 0
+      maximum: 168
+      default: 0
+      description: Minimum hours notice required before the slot start time
+      example: 2
+    max_per_day:
+      type: integer
+      minimum: 1
+      nullable: true
+      description: Maximum number of bookings per day. Null means unlimited.
+      example: 10
+    resource_ids:
+      type: array
+      items:
+        type: string
+      description: |
+        IDs of Resources required to deliver this service.
+        A slot is generated only when ALL listed resources are simultaneously available.
+      example: ["res_staff_ana", "res_chair_1"]
+    status:
+      $ref: '#/ServiceStatus'
+    sort_order:
+      type: integer
+      minimum: 0
+      default: 0
+      description: Display order in provider listings (ascending)
+      example: 1
+    created_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+    updated_at:
+      $ref: 'Common.yaml#/ISODateTime'
+      readOnly: true
+
+ServiceCreate:
+  type: object
+  required:
+    - name
+    - category
+    - duration_minutes
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+      example: "Muško šišanje"
+    description:
+      type: string
+      maxLength: 1000
+    category:
+      $ref: '#/ServiceCategory'
+    duration_minutes:
+      type: integer
+      minimum: 5
+      maximum: 480
+      example: 30
+    buffer_minutes:
+      type: integer
+      minimum: 0
+      maximum: 120
+      default: 0
+      example: 10
+    price:
+      $ref: 'Common.yaml#/Money'
+    max_advance_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+      default: 90
+    min_advance_hours:
+      type: integer
+      minimum: 0
+      maximum: 168
+      default: 0
+    max_per_day:
+      type: integer
+      minimum: 1
+      nullable: true
+    resource_ids:
+      type: array
+      items:
+        type: string
+      default: []
+    sort_order:
+      type: integer
+      minimum: 0
+      default: 0
+
+ServiceUpdate:
+  type: object
+  description: Partial update — all fields optional
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 100
+    description:
+      type: string
+      maxLength: 1000
+    category:
+      $ref: '#/ServiceCategory'
+    duration_minutes:
+      type: integer
+      minimum: 5
+      maximum: 480
+    buffer_minutes:
+      type: integer
+      minimum: 0
+      maximum: 120
+    price:
+      $ref: 'Common.yaml#/Money'
+    max_advance_days:
+      type: integer
+      minimum: 1
+      maximum: 365
+    min_advance_hours:
+      type: integer
+      minimum: 0
+      maximum: 168
+    max_per_day:
+      type: integer
+      minimum: 1
+      nullable: true
+    resource_ids:
+      type: array
+      items:
+        type: string
+    status:
+      $ref: '#/ServiceStatus'
+    sort_order:
+      type: integer
+      minimum: 0
+
+# Validation rules:
+# - duration_minutes must be a multiple of 5
+# - buffer_minutes + duration_minutes must not exceed 480
+# - All resource_ids must belong to the same provider
+# - max_advance_days must be >= ceil(min_advance_hours / 24)
+# - Deactivating a service does not cancel existing bookings
