@@ -1,0 +1,72 @@
+services:
+  server:
+    build:
+      context: ./server
+      target: development
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://obp:obp@postgres:5432/obp
+      REDIS_URL: redis://redis:6379
+      SERVER_URL: http://localhost:3000
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server/src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    ports:
+      - "3001:3001"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/app:/app/app
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: obp
+      POSTGRES_PASSWORD: obp
+      POSTGRES_DB: obp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obp -d obp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

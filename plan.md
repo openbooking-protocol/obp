@@ -729,3 +729,4 @@ OpenBooking Protocol (OBP) je otvoreni, decentralizovani standard za online reze
 4. **Federation-ready** — Svaka odluka se razmatra kroz prizmu federacije
 5. **Developer experience** — API mora biti jednostavan, dokumentacija jasna
 6. **Incremental delivery** — Svaka faza mora biti upotrebljiva sama za sebe
+7. **Git commit poruke** — Nikada ne pominjati AI agente, Claude, Anthropic, niti bilo koji alat za generisanje koda u commit porukama
