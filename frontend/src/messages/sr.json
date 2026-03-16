@@ -1,0 +1,299 @@
+{
+  "common": {
+    "loading": "Učitavanje...",
+    "error": "Nešto je pošlo naopako",
+    "retry": "Pokušaj ponovo",
+    "cancel": "Otkaži",
+    "save": "Sačuvaj",
+    "edit": "Izmeni",
+    "delete": "Obriši",
+    "confirm": "Potvrdi",
+    "back": "Nazad",
+    "next": "Dalje",
+    "search": "Pretraži",
+    "filter": "Filter",
+    "all": "Sve",
+    "none": "Ništa",
+    "yes": "Da",
+    "no": "Ne",
+    "or": "ili",
+    "and": "i",
+    "from": "Od",
+    "to": "Do",
+    "date": "Datum",
+    "time": "Vreme",
+    "status": "Status",
+    "actions": "Akcije",
+    "noResults": "Nema rezultata",
+    "viewAll": "Prikaži sve",
+    "close": "Zatvori",
+    "open": "Otvori",
+    "required": "Obavezno",
+    "optional": "Opciono"
+  },
+  "nav": {
+    "home": "Početna",
+    "search": "Pretražite usluge",
+    "dashboard": "Dashboard",
+    "admin": "Admin",
+    "login": "Prijava",
+    "logout": "Odjava",
+    "register": "Registracija",
+    "myBookings": "Moje rezervacije",
+    "forProviders": "Za pružaoce usluga"
+  },
+  "home": {
+    "hero": {
+      "title": "Rezervišite usluge, otvoreno",
+      "subtitle": "Otkrijte i rezervišite usluge kod nezavisnih pružaoca u federisanoj OpenBooking mreži.",
+      "searchPlaceholder": "Pretražite uslugu, kategoriju ili pružaoca...",
+      "searchButton": "Pretraži",
+      "browseCategories": "Pregledajte kategorije"
+    },
+    "categories": {
+      "title": "Pregledajte po kategoriji",
+      "health": "Zdravlje",
+      "beauty": "Lepota",
+      "sport": "Sport",
+      "education": "Edukacija",
+      "professional": "Profesionalne usluge",
+      "other": "Ostalo"
+    },
+    "featured": {
+      "title": "Istaknuti pružaoci"
+    },
+    "howItWorks": {
+      "title": "Kako funkcioniše",
+      "step1Title": "Pronađite uslugu",
+      "step1Desc": "Pretražujte sve pružaoce na ovom serveru i široj OBP mreži.",
+      "step2Title": "Izaberite termin",
+      "step2Desc": "Izaberite slobodan termin koji vam odgovara.",
+      "step3Title": "Rezervišite odmah",
+      "step3Desc": "Potvrdite rezervaciju za nekoliko sekundi. Nalog nije potreban."
+    }
+  },
+  "search": {
+    "title": "Rezultati pretrage",
+    "resultsFor": "Rezultati za",
+    "noResults": "Nema usluga koje odgovaraju pretrazi.",
+    "filters": {
+      "category": "Kategorija",
+      "priceRange": "Raspon cena",
+      "duration": "Trajanje",
+      "location": "Lokacija",
+      "federated": "Uključi federisane rezultate"
+    },
+    "sort": {
+      "label": "Sortiraj po",
+      "relevance": "Relevantnost",
+      "price_asc": "Cena: rastuće",
+      "price_desc": "Cena: opadajuće",
+      "duration": "Trajanje"
+    },
+    "result": {
+      "duration": "{duration} min",
+      "price": "{amount} {currency}",
+      "free": "Besplatno",
+      "book": "Rezerviši",
+      "viewProvider": "Pogledaj pružaoca",
+      "from": "od",
+      "federated": "Federisano"
+    }
+  },
+  "provider": {
+    "services": "Usluge",
+    "about": "O nama",
+    "contact": "Kontakt",
+    "location": "Lokacija",
+    "hours": "Radno vreme",
+    "noServices": "Nema dostupnih usluga.",
+    "closed": "Zatvoreno",
+    "open": "Otvoreno"
+  },
+  "booking": {
+    "title": "Rezervišite {service}",
+    "selectDate": "Izaberite datum",
+    "selectTime": "Izaberite vreme",
+    "noSlots": "Nema slobodnih termina na ovaj datum.",
+    "customerInfo": "Vaši podaci",
+    "name": "Ime i prezime",
+    "email": "Email adresa",
+    "phone": "Broj telefona",
+    "notes": "Napomena (opciono)",
+    "notesPlaceholder": "Posebni zahtevi ili napomena za pružaoca...",
+    "holdNotice": "Vaš termin će biti rezervisan na {minutes} minuta",
+    "holdExpired": "Rezervacija je istekla. Izaberite novi termin.",
+    "summary": "Pregled rezervacije",
+    "service": "Usluga",
+    "provider": "Pružalac",
+    "dateTime": "Datum i vreme",
+    "duration": "Trajanje",
+    "price": "Cena",
+    "total": "Ukupno",
+    "confirmBooking": "Potvrdi rezervaciju",
+    "processing": "Obrađivanje...",
+    "success": {
+      "title": "Rezervacija potvrđena!",
+      "subtitle": "Vaša rezervacija je primljena.",
+      "reference": "Referenca",
+      "addToCalendar": "Dodaj u kalendar",
+      "downloadIcal": "Preuzmi .ics",
+      "viewStatus": "Pogledaj status",
+      "bookAnother": "Rezervišite još jednu uslugu"
+    },
+    "status": {
+      "pending": "Na čekanju",
+      "confirmed": "Potvrđeno",
+      "cancelled": "Otkazano",
+      "completed": "Završeno",
+      "no_show": "Nije se pojavio"
+    },
+    "cancel": {
+      "title": "Otkažite rezervaciju",
+      "confirm": "Da li ste sigurni da želite da otkažete rezervaciju?",
+      "reason": "Razlog (opciono)",
+      "submit": "Otkažite rezervaciju",
+      "cancelled": "Rezervacija otkazana",
+      "cannotCancel": "Ova rezervacija ne može biti otkazana."
+    },
+    "check": {
+      "title": "Proverite status rezervacije",
+      "enterRef": "Unesite referencu rezervacije",
+      "refPlaceholder": "npr. bkg_abc123",
+      "checkStatus": "Proveri status"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard pružaoca",
+    "nav": {
+      "overview": "Pregled",
+      "bookings": "Rezervacije",
+      "services": "Usluge",
+      "schedule": "Raspored",
+      "profile": "Profil",
+      "webhooks": "Webhook-ovi",
+      "settings": "Podešavanja"
+    },
+    "overview": {
+      "todayBookings": "Danas",
+      "weekBookings": "Ova nedelja",
+      "monthRevenue": "Ovaj mesec",
+      "noShowRate": "Stopa no-show",
+      "upcomingBookings": "Nadolazeće rezervacije",
+      "recentBookings": "Nedavne rezervacije"
+    },
+    "bookings": {
+      "title": "Rezervacije",
+      "confirm": "Potvrdi",
+      "complete": "Označi kao završeno",
+      "noShow": "No show",
+      "cancelBooking": "Otkaži",
+      "newBooking": "Nova rezervacija",
+      "calendarView": "Kalendar",
+      "listView": "Lista",
+      "filters": {
+        "all": "Sve",
+        "today": "Danas",
+        "upcoming": "Nadolazeće",
+        "past": "Prošle"
+      }
+    },
+    "services": {
+      "title": "Usluge",
+      "addService": "Dodaj uslugu",
+      "editService": "Izmeni uslugu",
+      "deleteService": "Obriši uslugu",
+      "activate": "Aktiviraj",
+      "deactivate": "Deaktiviraj",
+      "active": "Aktivna",
+      "inactive": "Neaktivna"
+    },
+    "profile": {
+      "title": "Profil pružaoca",
+      "basicInfo": "Osnovne informacije",
+      "contactInfo": "Kontakt informacije",
+      "logoUpload": "Logo",
+      "saveChanges": "Sačuvaj izmene"
+    },
+    "schedule": {
+      "title": "Raspored",
+      "businessHours": "Radno vreme",
+      "exceptions": "Izuzeci",
+      "addException": "Dodaj izuzetak",
+      "days": {
+        "0": "Nedelja",
+        "1": "Ponedeljak",
+        "2": "Utorak",
+        "3": "Sreda",
+        "4": "Četvrtak",
+        "5": "Petak",
+        "6": "Subota"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Prijava",
+      "subtitle": "Prijavite se na vaš nalog pružaoca",
+      "email": "Email",
+      "password": "Lozinka",
+      "submit": "Prijavite se",
+      "forgotPassword": "Zaboravili ste lozinku?",
+      "noAccount": "Nemate nalog?",
+      "register": "Registrujte se kao pružalac"
+    },
+    "register": {
+      "title": "Registracija pružaoca",
+      "subtitle": "Kreirajte nalog pružaoca",
+      "businessName": "Naziv firme",
+      "email": "Email",
+      "password": "Lozinka",
+      "confirmPassword": "Potvrdi lozinku",
+      "submit": "Kreirajte nalog",
+      "hasAccount": "Već imate nalog?",
+      "login": "Prijavite se"
+    }
+  },
+  "admin": {
+    "title": "Administracija servera",
+    "nav": {
+      "stats": "Statistike",
+      "providers": "Pružaoci",
+      "federation": "Federisani serveri",
+      "settings": "Podešavanja"
+    },
+    "stats": {
+      "title": "Statistike servera",
+      "totalProviders": "Ukupno pružaoca",
+      "activeProviders": "Aktivnih pružaoca",
+      "totalBookings": "Ukupno rezervacija",
+      "totalServices": "Ukupno usluga",
+      "federationPeers": "Federisani serveri"
+    },
+    "providers": {
+      "title": "Upravljanje pružaocima",
+      "approve": "Odobri",
+      "suspend": "Suspenduj",
+      "delete": "Obriši"
+    },
+    "federation": {
+      "title": "Federisani serveri",
+      "addPeer": "Dodaj server",
+      "status": {
+        "active": "Aktivan",
+        "pending": "Na čekanju",
+        "blocked": "Blokiran"
+      }
+    }
+  },
+  "errors": {
+    "required": "Ovo polje je obavezno",
+    "email": "Unesite ispravnu email adresu",
+    "minLength": "Mora imati najmanje {min} karaktera",
+    "maxLength": "Mora imati najviše {max} karaktera",
+    "serverError": "Greška servera. Pokušajte ponovo.",
+    "notFound": "Nije pronađeno",
+    "unauthorized": "Morate biti prijavljeni",
+    "forbidden": "Nemate dozvolu za ovu akciju"
+  }
+}

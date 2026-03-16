@@ -1,0 +1,299 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "none": "None",
+    "yes": "Yes",
+    "no": "No",
+    "or": "or",
+    "and": "and",
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "time": "Time",
+    "status": "Status",
+    "actions": "Actions",
+    "noResults": "No results found",
+    "viewAll": "View all",
+    "close": "Close",
+    "open": "Open",
+    "required": "Required",
+    "optional": "Optional"
+  },
+  "nav": {
+    "home": "Home",
+    "search": "Search services",
+    "dashboard": "Dashboard",
+    "admin": "Admin",
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "myBookings": "My bookings",
+    "forProviders": "For providers"
+  },
+  "home": {
+    "hero": {
+      "title": "Book services, openly",
+      "subtitle": "Discover and book services from independent providers across the federated OpenBooking network.",
+      "searchPlaceholder": "Search for a service, category, or provider...",
+      "searchButton": "Search",
+      "browseCategories": "Browse categories"
+    },
+    "categories": {
+      "title": "Browse by category",
+      "health": "Health",
+      "beauty": "Beauty",
+      "sport": "Sport",
+      "education": "Education",
+      "professional": "Professional",
+      "other": "Other"
+    },
+    "featured": {
+      "title": "Featured providers"
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "step1Title": "Find a service",
+      "step1Desc": "Search across all providers on this server and the wider OBP network.",
+      "step2Title": "Pick a time",
+      "step2Desc": "Choose an available slot that works for you.",
+      "step3Title": "Book instantly",
+      "step3Desc": "Confirm your booking in seconds. No account required."
+    }
+  },
+  "search": {
+    "title": "Search results",
+    "resultsFor": "Results for",
+    "noResults": "No services found matching your search.",
+    "filters": {
+      "category": "Category",
+      "priceRange": "Price range",
+      "duration": "Duration",
+      "location": "Location",
+      "federated": "Include federated results"
+    },
+    "sort": {
+      "label": "Sort by",
+      "relevance": "Relevance",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low",
+      "duration": "Duration"
+    },
+    "result": {
+      "duration": "{duration} min",
+      "price": "{amount} {currency}",
+      "free": "Free",
+      "book": "Book",
+      "viewProvider": "View provider",
+      "from": "from",
+      "federated": "Federated"
+    }
+  },
+  "provider": {
+    "services": "Services",
+    "about": "About",
+    "contact": "Contact",
+    "location": "Location",
+    "hours": "Business hours",
+    "noServices": "No services available.",
+    "closed": "Closed",
+    "open": "Open"
+  },
+  "booking": {
+    "title": "Book {service}",
+    "selectDate": "Select date",
+    "selectTime": "Select time",
+    "noSlots": "No available slots on this date.",
+    "customerInfo": "Your information",
+    "name": "Full name",
+    "email": "Email address",
+    "phone": "Phone number",
+    "notes": "Notes (optional)",
+    "notesPlaceholder": "Any special requests or notes for the provider...",
+    "holdNotice": "Your slot will be held for {minutes} minutes",
+    "holdExpired": "Hold expired. Please select a new slot.",
+    "summary": "Booking summary",
+    "service": "Service",
+    "provider": "Provider",
+    "dateTime": "Date & time",
+    "duration": "Duration",
+    "price": "Price",
+    "total": "Total",
+    "confirmBooking": "Confirm booking",
+    "processing": "Processing...",
+    "success": {
+      "title": "Booking confirmed!",
+      "subtitle": "Your booking has been received.",
+      "reference": "Reference",
+      "addToCalendar": "Add to calendar",
+      "downloadIcal": "Download .ics",
+      "viewStatus": "View booking status",
+      "bookAnother": "Book another service"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "no_show": "No show"
+    },
+    "cancel": {
+      "title": "Cancel booking",
+      "confirm": "Are you sure you want to cancel this booking?",
+      "reason": "Reason (optional)",
+      "submit": "Cancel booking",
+      "cancelled": "Booking cancelled",
+      "cannotCancel": "This booking cannot be cancelled."
+    },
+    "check": {
+      "title": "Check booking status",
+      "enterRef": "Enter your booking reference",
+      "refPlaceholder": "e.g. bkg_abc123",
+      "checkStatus": "Check status"
+    }
+  },
+  "dashboard": {
+    "title": "Provider dashboard",
+    "nav": {
+      "overview": "Overview",
+      "bookings": "Bookings",
+      "services": "Services",
+      "schedule": "Schedule",
+      "profile": "Profile",
+      "webhooks": "Webhooks",
+      "settings": "Settings"
+    },
+    "overview": {
+      "todayBookings": "Today's bookings",
+      "weekBookings": "This week",
+      "monthRevenue": "This month",
+      "noShowRate": "No-show rate",
+      "upcomingBookings": "Upcoming bookings",
+      "recentBookings": "Recent bookings"
+    },
+    "bookings": {
+      "title": "Bookings",
+      "confirm": "Confirm",
+      "complete": "Mark complete",
+      "noShow": "No show",
+      "cancelBooking": "Cancel",
+      "newBooking": "New booking",
+      "calendarView": "Calendar",
+      "listView": "List",
+      "filters": {
+        "all": "All",
+        "today": "Today",
+        "upcoming": "Upcoming",
+        "past": "Past"
+      }
+    },
+    "services": {
+      "title": "Services",
+      "addService": "Add service",
+      "editService": "Edit service",
+      "deleteService": "Delete service",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "profile": {
+      "title": "Provider profile",
+      "basicInfo": "Basic information",
+      "contactInfo": "Contact information",
+      "logoUpload": "Logo",
+      "saveChanges": "Save changes"
+    },
+    "schedule": {
+      "title": "Schedule",
+      "businessHours": "Business hours",
+      "exceptions": "Exceptions",
+      "addException": "Add exception",
+      "days": {
+        "0": "Sunday",
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Sign in to your provider account",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "register": "Register as provider"
+    },
+    "register": {
+      "title": "Register as provider",
+      "subtitle": "Create your provider account",
+      "businessName": "Business name",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "submit": "Create account",
+      "hasAccount": "Already have an account?",
+      "login": "Sign in"
+    }
+  },
+  "admin": {
+    "title": "Server admin",
+    "nav": {
+      "stats": "Server stats",
+      "providers": "Providers",
+      "federation": "Federation peers",
+      "settings": "Settings"
+    },
+    "stats": {
+      "title": "Server statistics",
+      "totalProviders": "Total providers",
+      "activeProviders": "Active providers",
+      "totalBookings": "Total bookings",
+      "totalServices": "Total services",
+      "federationPeers": "Federation peers"
+    },
+    "providers": {
+      "title": "Provider management",
+      "approve": "Approve",
+      "suspend": "Suspend",
+      "delete": "Delete"
+    },
+    "federation": {
+      "title": "Federation peers",
+      "addPeer": "Add peer",
+      "status": {
+        "active": "Active",
+        "pending": "Pending",
+        "blocked": "Blocked"
+      }
+    }
+  },
+  "errors": {
+    "required": "This field is required",
+    "email": "Please enter a valid email",
+    "minLength": "Must be at least {min} characters",
+    "maxLength": "Must be at most {max} characters",
+    "serverError": "Server error. Please try again.",
+    "notFound": "Not found",
+    "unauthorized": "You must be logged in",
+    "forbidden": "You don't have permission to do that"
+  }
+}
