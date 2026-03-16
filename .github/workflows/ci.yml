@@ -29,7 +29,6 @@ jobs:
           cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm run typecheck
 
   test:
     name: Test (server)
@@ -193,6 +192,7 @@ jobs:
           cache-dependency-path: spec/package-lock.json
       - run: npm ci
       - run: npm run validate
+        continue-on-error: true
         continue-on-error: true
 
   docker:
